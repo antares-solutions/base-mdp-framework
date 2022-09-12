@@ -1,0 +1,312 @@
+{
+	"name": "canvas-graphql-load-by-course",
+	"properties": {
+		"activities": [
+			{
+				"name": "get-token",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "https://@{pipeline().globalParameters.keyVaultName}.vault.azure.net/secrets/Canvas-API-Key?api-version=7.0",
+						"type": "Expression"
+					},
+					"method": "GET",
+					"linkedServices": [
+						{
+							"referenceName": "AzureKeyVault",
+							"type": "LinkedServiceReference"
+						}
+					],
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "get-domain",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "https://@{pipeline().globalParameters.keyVaultName}.vault.azure.net/secrets/Canvas-Domain?api-version=7.0",
+						"type": "Expression"
+					},
+					"method": "GET",
+					"linkedServices": [
+						{
+							"referenceName": "AzureKeyVault",
+							"type": "LinkedServiceReference"
+						}
+					],
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "set-url",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "get-domain",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "currentUrl",
+					"value": {
+						"value": "@concat(replace(\n'https://{canvas-domain}/api/graphql'\n, '{canvas-domain}', activity('get-domain').output.value)\n, '?per_page=100')",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "set-root-folder",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "rootFolder",
+					"value": {
+						"value": "@replace(replace(replace(replace(replace(replace(\npipeline().parameters.task.RawPath\n,'$yyyy$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'yyyy'))\n,'$MM$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'MM'))\n,'$dd$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'dd'))\n,'$HH$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'HH'))\n,'$mm$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'mm'))\n,'$guid$.json', '')",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "get-all-courses",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "get-token",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "set-url",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 1,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@variables('currentUrl')",
+						"type": "Expression"
+					},
+					"method": "POST",
+					"headers": {
+						"Authorization": {
+							"value": "Bearer @{activity('get-token').output.value}",
+							"type": "Expression"
+						},
+						"Content-Type": "multipart/form-data"
+					},
+					"body": {
+						"value": "query=query {\n  account(id: \"111\") {\n    coursesConnection {\n      nodes {\n        _id\n      }\n    }\n  }\n}\n",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "set-all-courses",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "get-all-courses",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "allCourses",
+					"value": {
+						"value": "@activity('get-all-courses').output.data.account.coursesConnection.nodes",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "for-each-course",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "set-all-courses",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "set-root-folder",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@variables('allCourses')",
+						"type": "Expression"
+					},
+					"batchCount": 10,
+					"activities": [
+						{
+							"name": "copy-rest",
+							"type": "Copy",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "RestSource",
+									"httpRequestTimeout": "00:05:00",
+									"requestInterval": "00.00:00:00.010",
+									"requestMethod": "POST",
+									"requestBody": {
+										"value": "@replace(pipeline().parameters.task.SourceQuery,'{course_id}', string(item()._id))",
+										"type": "Expression"
+									},
+									"additionalHeaders": {
+										"Authorization": {
+											"value": "Bearer @{activity('get-token').output.value}",
+											"type": "Expression"
+										},
+										"Content-Type": "multipart/form-data"
+									},
+									"paginationRules": {
+										"supportRFC5988": "true"
+									}
+								},
+								"sink": {
+									"type": "JsonSink",
+									"storeSettings": {
+										"type": "AzureBlobFSWriteSettings"
+									},
+									"formatSettings": {
+										"type": "JsonWriteSettings"
+									}
+								},
+								"enableStaging": false
+							},
+							"inputs": [
+								{
+									"referenceName": "REST_Binary",
+									"type": "DatasetReference",
+									"parameters": {
+										"url": "@variables('currentUrl')"
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "DLS_Json",
+									"type": "DatasetReference",
+									"parameters": {
+										"filePath": {
+											"value": "@replace(replace(\n'$ROOT$/$guid$.json'\n,'$ROOT$', variables('rootFolder'))\n,'$guid$', guid())",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						}
+					]
+				}
+			},
+			{
+				"name": "task-raw-path",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "set-root-folder",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "log-status-update",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": false,
+					"parameters": {
+						"ID": {
+							"value": "@pipeline().parameters.task.ID",
+							"type": "Expression"
+						},
+						"Property": "RawPath",
+						"Value": {
+							"value": "@variables('rootFolder')",
+							"type": "Expression"
+						}
+					}
+				}
+			}
+		],
+		"parameters": {
+			"task": {
+				"type": "object"
+			}
+		},
+		"variables": {
+			"currentUrl": {
+				"type": "String"
+			},
+			"rootFolder": {
+				"type": "String"
+			},
+			"apiResponeseProperty": {
+				"type": "String"
+			},
+			"allCourses": {
+				"type": "Array"
+			}
+		},
+		"folder": {
+			"name": "ELT-Framework/SourceHandler/Canvas"
+		},
+		"annotations": []
+	}
+}

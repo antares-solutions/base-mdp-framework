@@ -1,0 +1,19 @@
+{
+	"name": "AzureSqlDatabase_Ctrldb",
+	"type": "Microsoft.DataFactory/factories/linkedservices",
+	"properties": {
+		"description": "ETL Control database linked service",
+		"annotations": [],
+		"type": "AzureSqlDatabase",
+		"typeProperties": {
+			"connectionString": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "AzureKeyVault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "ADF-ControlDB"
+			}
+		}
+	}
+}

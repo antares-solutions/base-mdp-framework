@@ -1,0 +1,17 @@
+{
+	"name": "HttpLinkAnonymous",
+	"properties": {
+		"parameters": {
+			"url": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "HttpServer",
+		"typeProperties": {
+			"url": "@{linkedService().url}",
+			"enableServerCertificateValidation": false,
+			"authenticationType": "Anonymous"
+		}
+	}
+}

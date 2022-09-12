@@ -1,0 +1,126 @@
+{
+	"$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"apiName": {
+			"type": "String"
+		},
+		"logicAppName": {
+			"type": "String"
+		}
+	},
+	"variables": {
+		"subscriptionId": "[subscription().subscriptionId]",
+		"location": "[resourceGroup().location]",
+		"resourceGroupName": "[resourceGroup().name]"
+	},
+	"resources": [
+		{
+			"type": "Microsoft.Web/connections",
+			"apiVersion": "2016-06-01",
+			"name": "[parameters('apiName')]",
+			"location": "[variables('location')]",
+			"kind": "V1",
+			"properties": {
+				"displayName": "[parameters('apiName')]",
+				"api": {
+					"name": "office365",
+					"displayName": "Office 365 Outlook",
+					"iconUri": "https://connectoricons-prod.azureedge.net/releases/v1.0.1538/1.0.1538.2621/office365/icon.png",
+					"brandColor": "#0078D4",
+					"id": "[concat('/subscriptions/', variables('subscriptionId'), '/providers/Microsoft.Web/locations/', variables('location'), '/managedApis/office365')]",
+					"type": "Microsoft.Web/locations/managedApis"
+				}
+			}
+		},
+		{
+			"type": "Microsoft.Logic/workflows",
+			"apiVersion": "2017-07-01",
+			"name": "[parameters('logicAppName')]",
+			"location": "[variables('location')]",
+			"dependsOn": [
+				"[parameters('apiName')]",
+				"[concat('Microsoft.Web/connections/', parameters('apiName'))]"
+			],
+			"properties": {
+				"state": "Enabled",
+				"definition": {
+					"$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+					"contentVersion": "1.0.0.0",
+					"parameters": {
+						"$connections": {
+							"type": "Object"
+						}
+					},
+					"triggers": {
+						"manual": {
+							"type": "Request",
+							"kind": "Http",
+							"inputs": {
+								"method": "POST",
+								"schema": {
+									"properties": {
+										"importance": {
+											"type": "string"
+										},
+										"body": {
+											"type": "string"
+										},
+										"recipient": {
+											"type": "string"
+										},
+										"sender": {
+											"type": "string"
+										},
+										"subject": {
+											"type": "string"
+										}
+									},
+									"type": "object"
+								}
+							}
+						}
+					},
+					"actions": {
+						"Send_an_email_(V2)": {
+							"runAfter": {},
+							"type": "ApiConnection",
+							"inputs": {
+								"body": {
+									"Body": "@{triggerBody()?['body']}",
+									"Importance": "@triggerBody()?['importance']",
+									"Subject": "@triggerBody()?['subject']",
+									"To": "@triggerBody()?['recipient']"
+								},
+								"host": {
+									"connection": {
+										"name": "@parameters('$connections')['office365']['connectionId']"
+									}
+								},
+								"method": "post",
+								"path": "/v2/Mail"
+							}
+						}
+					}
+				},
+				"parameters": {
+					"$connections": {
+						"value": {
+							"office365": {
+								"connectionId": "[concat('/subscriptions/', variables('subscriptionId'), '/resourceGroups/', variables('resourceGroupName'),'/providers/Microsoft.Web/connections/', parameters('apiName'))]",
+								"connectionName": "[parameters('apiName')]",
+								"id": "[concat('/subscriptions/', variables('subscriptionId'), '/providers/Microsoft.Web/locations/', variables('location'), '/managedApis/office365')]"
+							}
+						}
+					}
+				}
+			}
+		}
+	],
+	"outputs": {
+		"logicAppUrl": {
+			"type": "string",
+			"value": "[listCallbackURL(concat(resourceId('Microsoft.Logic/workflows/', parameters('logicAppName')), '/triggers/manual'), '2017-07-01').value]"
+		}
+	}
+}

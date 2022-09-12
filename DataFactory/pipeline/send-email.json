@@ -1,0 +1,90 @@
+{
+	"name": "send-email",
+	"properties": {
+		"activities": [
+			{
+				"name": "send-email",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "get-url",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@activity('get-url').output.value",
+						"type": "Expression"
+					},
+					"method": "POST",
+					"headers": {
+						"Content-Type": "application/json"
+					},
+					"body": {
+						"value": "{\n\t\"body\" : \"@{pipeline().parameters.body}\",\n\t\"subject\" : \"@{pipeline().parameters.subject}\",\n\t\"recipient\" : \"@{pipeline().parameters.email}\",\n\t\"importance\" : \"@{pipeline().parameters.importance}\"\n}",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "get-url",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "https://@{pipeline().globalParameters.keyVaultName}.vault.azure.net/secrets/LogicApp-Url-Send-Email?api-version=7.0",
+						"type": "Expression"
+					},
+					"method": "GET",
+					"linkedServices": [
+						{
+							"referenceName": "AzureKeyVault",
+							"type": "LinkedServiceReference"
+						}
+					],
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"email": {
+				"type": "string"
+			},
+			"subject": {
+				"type": "string"
+			},
+			"body": {
+				"type": "string"
+			},
+			"importance": {
+				"type": "string",
+				"defaultValue": "Normal"
+			}
+		},
+		"folder": {
+			"name": "ELT-Framework/EmailTrigger"
+		},
+		"annotations": []
+	}
+}

@@ -1,0 +1,244 @@
+{
+	"name": "Trusted",
+	"properties": {
+		"activities": [
+			{
+				"name": "if-trusted-handler",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "log-status-start",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@not(empty(pipeline().parameters.task.TrustedHandler))",
+						"type": "Expression"
+					},
+					"ifTrueActivities": [
+						{
+							"name": "trusted-databricks",
+							"type": "DatabricksNotebook",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"notebookPath": {
+									"value": "/ELT-Framework/Zone/@{pipeline().parameters.task.TrustedHandler}",
+									"type": "Expression"
+								},
+								"baseParameters": {
+									"task": {
+										"value": "@{pipeline().parameters.task}",
+										"type": "Expression"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "AzureDatabricks_defaultCluster",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "log-databricks",
+							"type": "ExecutePipeline",
+							"dependsOn": [
+								{
+									"activity": "trusted-databricks",
+									"dependencyConditions": [
+										"Completed"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "log-message",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": false,
+								"parameters": {
+									"ID": {
+										"value": "@pipeline().parameters.task.ID",
+										"type": "Expression"
+									},
+									"ActivityType": "trusted-databricks",
+									"Message": {
+										"value": "@{activity('trusted-databricks')}",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "log-status-start",
+				"type": "ExecutePipeline",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "log-status-update",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": false,
+					"parameters": {
+						"ID": {
+							"value": "@pipeline().parameters.task.ID",
+							"type": "Expression"
+						},
+						"Property": "TrustedStartDTS",
+						"Value": {
+							"value": "@formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'yyyy-MM-dd HH:mm:ss')",
+							"type": "Expression"
+						},
+						"TableName": "ExtractLoadStatus"
+					}
+				}
+			},
+			{
+				"name": "log-status-end",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "if-trusted-handler",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "log-status-update",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": false,
+					"parameters": {
+						"ID": {
+							"value": "@pipeline().parameters.task.ID",
+							"type": "Expression"
+						},
+						"Property": "TrustedEndDTS",
+						"Value": {
+							"value": "@formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'yyyy-MM-dd HH:mm:ss')",
+							"type": "Expression"
+						},
+						"TableName": "ExtractLoadStatus"
+					}
+				}
+			},
+			{
+				"name": "log-status-fail",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "if-trusted-handler",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "log-status-update",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": false,
+					"parameters": {
+						"ID": {
+							"value": "@pipeline().parameters.task.ID",
+							"type": "Expression"
+						},
+						"Property": "TrustedStatus",
+						"Value": "Fail",
+						"TableName": "ExtractLoadStatus"
+					}
+				}
+			},
+			{
+				"name": "log-status-success",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "if-trusted-handler",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "log-status-update",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": false,
+					"parameters": {
+						"ID": {
+							"value": "@pipeline().parameters.task.ID",
+							"type": "Expression"
+						},
+						"Property": "TrustedStatus",
+						"Value": "Success",
+						"TableName": "ExtractLoadStatus"
+					}
+				}
+			},
+			{
+				"name": "log-status-end-fail",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "if-trusted-handler",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "log-status-update",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": false,
+					"parameters": {
+						"ID": {
+							"value": "@pipeline().parameters.task.ID",
+							"type": "Expression"
+						},
+						"Property": "TrustedEndDTS",
+						"Value": {
+							"value": "@formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'yyyy-MM-dd HH:mm:ss')",
+							"type": "Expression"
+						},
+						"TableName": "ExtractLoadStatus"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"task": {
+				"type": "object"
+			}
+		},
+		"folder": {
+			"name": "ELT-Framework/Zone"
+		},
+		"annotations": []
+	}
+}

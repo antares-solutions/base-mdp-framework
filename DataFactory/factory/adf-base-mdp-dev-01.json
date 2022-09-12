@@ -1,0 +1,16 @@
+{
+	"name": "adf-base-mdp-dev-01",
+	"properties": {
+		"globalParameters": {
+			"keyVaultName": {
+				"type": "string",
+				"value": "akv-base-mdp-dev-01"
+			},
+			"storageName": {
+				"type": "string",
+				"value": "dlsbasemdpdev01"
+			}
+		}
+	},
+	"location": "australiaeast"
+}

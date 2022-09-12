@@ -1,0 +1,36 @@
+{
+	"name": "DLS_Csv",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "AzureDataLakeStorage",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"filePath": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "ELT-Framework/DLS"
+		},
+		"annotations": [],
+		"type": "DelimitedText",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"fileName": {
+					"value": "@dataset().filePath",
+					"type": "Expression"
+				}
+			},
+			"columnDelimiter": ",",
+			"escapeChar": "\\",
+			"firstRowAsHeader": {
+				"value": "@bool(true)",
+				"type": "Expression"
+			},
+			"quoteChar": "\""
+		},
+		"schema": []
+	}
+}

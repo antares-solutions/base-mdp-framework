@@ -1,0 +1,364 @@
+{
+	"name": "canvas-graphql-load",
+	"properties": {
+		"activities": [
+			{
+				"name": "get-token",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "https://@{pipeline().globalParameters.keyVaultName}.vault.azure.net/secrets/Canvas-API-Key?api-version=7.0",
+						"type": "Expression"
+					},
+					"method": "GET",
+					"linkedServices": [
+						{
+							"referenceName": "AzureKeyVault",
+							"type": "LinkedServiceReference"
+						}
+					],
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "get-domain",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "https://@{pipeline().globalParameters.keyVaultName}.vault.azure.net/secrets/Canvas-Domain?api-version=7.0",
+						"type": "Expression"
+					},
+					"method": "GET",
+					"linkedServices": [
+						{
+							"referenceName": "AzureKeyVault",
+							"type": "LinkedServiceReference"
+						}
+					],
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "set-url",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "get-domain",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "currentUrl",
+					"value": {
+						"value": "@concat(replace(\n'https://{canvas-domain}/api/graphql'\n, '{canvas-domain}', activity('get-domain').output.value)\n, '?per_page=100')",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "while-next-link",
+				"type": "Until",
+				"dependsOn": [
+					{
+						"activity": "get-token",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "set-url",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "set-root-folder",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@equals(length(variables('currentUrl')), 0)",
+						"type": "Expression"
+					},
+					"activities": [
+						{
+							"name": "invoke-api",
+							"type": "WebActivity",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 1,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"url": {
+									"value": "@variables('currentUrl')",
+									"type": "Expression"
+								},
+								"method": "POST",
+								"headers": {
+									"Authorization": {
+										"value": "Bearer @{activity('get-token').output.value}",
+										"type": "Expression"
+									},
+									"Content-Type": "multipart/form-data"
+								},
+								"body": {
+									"value": "@pipeline().parameters.task.SourceQuery",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "save-file",
+							"type": "WebActivity",
+							"dependsOn": [
+								{
+									"activity": "invoke-api",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"url": {
+									"value": "@replace(replace(replace(\n'https://$STORAGE$.blob.core.windows.net$ROOT$/$guid$.json?resource=filesystem'\n,'$STORAGE$', pipeline().globalParameters.storageName)\n,'$ROOT$', variables('rootFolder'))\n,'$guid$', guid())",
+									"type": "Expression"
+								},
+								"method": "PUT",
+								"headers": {
+									"x-ms-version": "2017-11-09",
+									"x-ms-blob-type": "BlockBlob"
+								},
+								"body": {
+									"value": "@{activity('invoke-api').output.data}",
+									"type": "Expression"
+								},
+								"authentication": {
+									"type": "MSI",
+									"resource": "https://storage.azure.com/"
+								}
+							}
+						},
+						{
+							"name": "if-next-link",
+							"type": "IfCondition",
+							"dependsOn": [
+								{
+									"activity": "invoke-api",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"expression": {
+									"value": "@contains(if(empty(activity('invoke-api').output.ADFWebActivityResponseHeaders), '', activity('invoke-api').output.ADFWebActivityResponseHeaders), 'next')",
+									"type": "Expression"
+								},
+								"ifFalseActivities": [
+									{
+										"name": "set-done",
+										"type": "SetVariable",
+										"dependsOn": [],
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "currentUrl",
+											"value": {
+												"value": "@string('')",
+												"type": "Expression"
+											}
+										}
+									}
+								],
+								"ifTrueActivities": [
+									{
+										"name": "set-current-url",
+										"type": "SetVariable",
+										"dependsOn": [],
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "currentUrl",
+											"value": {
+												"value": "@concat('https://', split(split(split(split(activity('invoke-api').output.ADFWebActivityResponseHeaders.Link, 'next')[0], 'current')[1], 'https://')[1], '>;')[0])",
+												"type": "Expression"
+											}
+										}
+									}
+								]
+							}
+						},
+						{
+							"name": "set-done-api-error",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "invoke-api",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "currentUrl",
+								"value": {
+									"value": "@string('')",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "set-done-save-error",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "save-file",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "currentUrl",
+								"value": {
+									"value": "@string('')",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "set-done-next-error",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "if-next-link",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "currentUrl",
+								"value": {
+									"value": "@string('')",
+									"type": "Expression"
+								}
+							}
+						}
+					],
+					"timeout": "7.00:00:00"
+				}
+			},
+			{
+				"name": "set-root-folder",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "rootFolder",
+					"value": {
+						"value": "@replace(replace(replace(replace(replace(replace(\npipeline().parameters.task.RawPath\n,'$yyyy$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'yyyy'))\n,'$MM$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'MM'))\n,'$dd$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'dd'))\n,'$HH$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'HH'))\n,'$mm$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'mm'))\n,'$guid$.json', '')",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "task-raw-path",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "set-root-folder",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "log-status-update",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": false,
+					"parameters": {
+						"ID": {
+							"value": "@pipeline().parameters.task.ID",
+							"type": "Expression"
+						},
+						"Property": "RawPath",
+						"Value": {
+							"value": "@variables('rootFolder')",
+							"type": "Expression"
+						}
+					}
+				}
+			}
+		],
+		"parameters": {
+			"task": {
+				"type": "object"
+			}
+		},
+		"variables": {
+			"currentUrl": {
+				"type": "String"
+			},
+			"rootFolder": {
+				"type": "String"
+			},
+			"apiResponeseProperty": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "ELT-Framework/SourceHandler/Canvas"
+		},
+		"annotations": []
+	}
+}

@@ -1,0 +1,75 @@
+{
+	"name": "log-message",
+	"properties": {
+		"activities": [
+			{
+				"name": "log-copy",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[dbo].[LogMessage]",
+					"storedProcedureParameters": {
+						"ID": {
+							"value": {
+								"value": "@pipeline().parameters.ID",
+								"type": "Expression"
+							},
+							"type": "Int32"
+						},
+						"ActivityType": {
+							"value": {
+								"value": "@pipeline().parameters.ActivityType",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"Message": {
+							"value": {
+								"value": "@pipeline().parameters.Message",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"IsTransform": {
+							"value": {
+								"value": "@pipeline().parameters.IsTransform",
+								"type": "Expression"
+							},
+							"type": "Boolean"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "AzureSqlDatabase_Ctrldb",
+					"type": "LinkedServiceReference"
+				}
+			}
+		],
+		"parameters": {
+			"ID": {
+				"type": "int"
+			},
+			"ActivityType": {
+				"type": "string"
+			},
+			"Message": {
+				"type": "string"
+			},
+			"IsTransform": {
+				"type": "bool"
+			}
+		},
+		"folder": {
+			"name": "ELT-Framework/Common/Logging"
+		},
+		"annotations": []
+	}
+}

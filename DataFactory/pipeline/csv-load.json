@@ -1,0 +1,303 @@
+{
+	"name": "csv-load",
+	"properties": {
+		"activities": [
+			{
+				"name": "set-filename",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "OutputFileName",
+					"value": {
+						"value": "@guid()",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "set-path",
+				"description": "",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "OutputPath",
+					"value": {
+						"value": "@pipeline().parameters.TaskDetails.RawPath",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "set-full-path",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "set-filename",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "set-path",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "OutputFullPath",
+					"value": {
+						"value": "@replace(replace(replace(replace(replace(\nconcat(variables('OutputPath'), if(endswith(variables('OutputPath'), '/'), '', '/'), variables('OutputFileName'), '.parquet')\n,'$yyyy$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'yyyy'))\n,'$MM$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'MM'))\n,'$dd$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'dd'))\n,'$HH$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'HH'))\n,'$mm$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'mm'))\n",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Input-Folderpath",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "InputFolderPath",
+					"value": {
+						"value": "@pipeline().parameters.TaskDetails.SourceFolderPath",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Input-Filepath",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "InputFilePath",
+					"value": {
+						"value": "@pipeline().parameters.TaskDetails.SourceFileName",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Set-full-inputpath",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Input-Folderpath",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Input-Filepath",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Input-Filepath_ID",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "InputFullPath",
+					"value": {
+						"value": "@concat(variables('InputFolderPath'),'/',variables('InputFilePath'))",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "copy-CSV",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "set-full-path",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Set-full-inputpath",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [
+					{
+						"name": "Destination",
+						"value": "raw/Cewa Financials/"
+					}
+				],
+				"typeProperties": {
+					"source": {
+						"type": "DelimitedTextSource",
+						"storeSettings": {
+							"type": "AzureBlobFSReadSettings",
+							"recursive": true,
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "DelimitedTextReadSettings"
+						}
+					},
+					"sink": {
+						"type": "ParquetSink",
+						"storeSettings": {
+							"type": "AzureBlobFSWriteSettings"
+						},
+						"formatSettings": {
+							"type": "ParquetWriteSettings"
+						}
+					},
+					"enableStaging": false
+				},
+				"inputs": [
+					{
+						"referenceName": "DLS_Csv",
+						"type": "DatasetReference",
+						"parameters": {
+							"filePath": {
+								"value": "@variables('InputFullPath')",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DLS_Parquet",
+						"type": "DatasetReference",
+						"parameters": {
+							"BlobPath": {
+								"value": "@variables('OutputFullPath')",
+								"type": "Expression"
+							}
+						}
+					}
+				]
+			},
+			{
+				"name": "task-raw-path",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "copy-CSV",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "log-status-update",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"ID": {
+							"value": "@pipeline().parameters.TaskDetails.ID",
+							"type": "Expression"
+						},
+						"Property": "RawPath",
+						"Value": {
+							"value": "@variables('OutputFullPath')",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "log-copy",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "copy-CSV",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "log-message",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"ID": {
+							"value": "@pipeline().parameters.TaskDetails.ID",
+							"type": "Expression"
+						},
+						"ActivityType": "copy-data",
+						"Message": {
+							"value": "@{activity('copy-CSV')}",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Input-Filepath_ID",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "InputID",
+					"value": {
+						"value": "@string(pipeline().parameters.TaskDetails.ID)",
+						"type": "Expression"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"TaskDetails": {
+				"type": "object"
+			}
+		},
+		"variables": {
+			"OutputFileName": {
+				"type": "String"
+			},
+			"OutputPath": {
+				"type": "String"
+			},
+			"OutputFullPath": {
+				"type": "String"
+			},
+			"InputFolderPath": {
+				"type": "String"
+			},
+			"InputFilePath": {
+				"type": "String"
+			},
+			"InputFullPath": {
+				"type": "String"
+			},
+			"InputID": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "ELT-Framework/SourceHandler/DLS"
+		},
+		"annotations": []
+	}
+}

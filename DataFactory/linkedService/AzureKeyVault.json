@@ -1,0 +1,11 @@
+{
+	"name": "AzureKeyVault",
+	"properties": {
+		"annotations": [],
+		"type": "AzureKeyVault",
+		"typeProperties": {
+			"baseUrl": "https://au-akv-bi-mdw-dev-001.vault.azure.net/"
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/linkedservices"
+}

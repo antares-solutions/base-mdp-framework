@@ -1,0 +1,1239 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"type": "string",
+			"metadata": "Data Factory name",
+			"defaultValue": "adf-base-mdp-dev-01"
+		},
+		"dataFactory_properties_globalParameters_keyVaultName_value": {
+			"type": "string",
+			"defaultValue": "akv-base-mdp-dev-01"
+		},
+		"dataFactory_properties_globalParameters_storageName_value": {
+			"type": "string",
+			"defaultValue": "dlsbasemdpdev01"
+		},
+		"dataFactory_location": {
+			"type": "string",
+			"defaultValue": "australiaeast"
+		},
+		"AzureKeyVault_properties_typeProperties_baseUrl": {
+			"type": "string",
+			"defaultValue": "https://akv-base-mdp-dev-01.vault.azure.net/"
+		},
+		"HttpLinkAnonymous_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "@{linkedService().url}"
+		},
+		"REST_Anonymous_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "@{linkedService().url}"
+		},
+		"AmazonS3_properties_typeProperties_accessKeyId": {
+			"type": "object",
+			"defaultValue": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "AzureKeyVault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": {
+					"value": "@concat(linkedService().systemName, '-AccessKeyID-KVSecret')",
+					"type": "Expression"
+				}
+			}
+		},
+		"AzureDataLakeStorage_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "https://dlsbasemdpdev01.dfs.core.windows.net"
+		},
+		"AzureSqlDatabase_Ctrldb_properties_typeProperties_connectionString_secretName": {
+			"type": "string",
+			"defaultValue": "ADF-ControlDB"
+		},
+		"SFTP_Basic_properties_typeProperties_host": {
+			"type": "object",
+			"defaultValue": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "AzureKeyVault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "Preceda-SFTP-Host"
+			}
+		},
+		"SFTP_Basic_properties_typeProperties_userName": {
+			"type": "object",
+			"defaultValue": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "AzureKeyVault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "Preceda-SFTP-Username"
+			}
+		},
+		"SQLServer_properties_typeProperties_connectionString_secretName": {
+			"type": "string",
+			"defaultValue": "@linkedService().kvSecret"
+		}
+	},
+	"variables": {
+		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+	},
+	"resources": [
+		{
+			"name": "[parameters('factoryName')]",
+			"type": "Microsoft.DataFactory/factories",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"globalParameters": {
+					"keyVaultName": {
+						"type": "string",
+						"value": "[parameters('dataFactory_properties_globalParameters_keyVaultName_value')]"
+					},
+					"storageName": {
+						"type": "string",
+						"value": "[parameters('dataFactory_properties_globalParameters_storageName_value')]"
+					}
+				}
+			},
+			"dependsOn": [],
+			"location": "[parameters('dataFactory_location')]"
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/email-notication')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Send email on failure",
+						"type": "WebActivity",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"url": "https://prod-23.australiaeast.logic.azure.com:443/workflows/0fadb5ddcd7e4d8d94d3ab68a0f3a1a4/triggers/manual/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=ZtgYhoSXZEO0YSyP_Ta2ZfVj4fqDtDGsyUOrYP1z-Wc",
+							"method": "POST",
+							"headers": {
+								"Content-Type": "application/json"
+							},
+							"body": {
+								"value": "{\n   \"Title\": \"PIPELINE FAILURE\",\n   \"Color\": \"Red\",\n   \"DataFactoryName\": \"@{pipeline().parameters.vDataFactoryName}\",\n   \"PipelineName\": \"@{pipeline().parameters.vPipelineName}\",\n   \"ActivityName\": \"@{pipeline().parameters.vActivityName}\",\n   \"PipelineRunID\": \"@{pipeline().parameters.vPipelineRunID}\",\n   \"PipelineActivity\": \"@{pipeline().parameters.vPipelineRunID}\",\n   \"PipelineTriggerID\": \"@{pipeline().parameters.vPipelineTriggerID}\",\n   \"PipelineTriggerName\": \"@{pipeline().parameters.vPipelineTriggerName}\",\n   \"PipelineTriggerType\": \"@{pipeline().parameters.vPipelineTriggerType}\",\n   \"PipelineTriggerTime\": \"@{pipeline().parameters.vPipelineTriggerTime}\",\n   \"ExecutionStartTime\": \"@{pipeline().parameters.vExecutionStartTime}\",\n   \"ExecutionEndTime\": \"@{pipeline().parameters.vExecutionEndTime}\",\n   \"ActivityRunID\": \"@{pipeline().parameters.vActivityRunID}\",\n   \"ErrorCode\": \"@{pipeline().parameters.vErrorCode}\",\n   \"FailureType\": \"@{pipeline().parameters.vFailureType}\",\n   \"Subject\":\"ADF Pipeline @{pipeline().parameters.vPipelineName} had failed\",\n   \"ErrorMessage\": \"@{pipeline().parameters.vErrorMessage}\",\n   \"Contact\": \"kishoreb@antaressolutions.com.au\",\n   \"EmailTo\": \"@{variables('vToEmail')}\",\n   \"EmailCc\": \"@{variables('vCCEmail')}\",\n   \"ErrorDate\": \"@{pipeline().parameters.vErrorDate}\"\n}\n\n\n\n",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"vPipelineName": {
+						"type": "string"
+					},
+					"vPipelineTriggerName": {
+						"type": "string"
+					},
+					"vPipelineTriggerType": {
+						"type": "string"
+					},
+					"vPipelineTriggerID": {
+						"type": "string"
+					},
+					"vPipelineTriggerTime": {
+						"type": "string"
+					},
+					"vErrorMessage": {
+						"type": "string"
+					},
+					"vDataFactoryName": {
+						"type": "string"
+					},
+					"vPipelineRunID": {
+						"type": "string"
+					},
+					"vErrorCode": {
+						"type": "string"
+					},
+					"vFailureType": {
+						"type": "string"
+					},
+					"vActivityRunID": {
+						"type": "string"
+					},
+					"vExecutionStartTime": {
+						"type": "string"
+					},
+					"vExecutionEndTime": {
+						"type": "string"
+					},
+					"vErrorDate": {
+						"type": "string"
+					},
+					"vActivityName": {
+						"type": "string"
+					}
+				},
+				"variables": {
+					"vToEmail": {
+						"type": "String",
+						"defaultValue": "kishoreb@antaressolutions.com.au, kelvinh@antaressolutions.com.au"
+					},
+					"vCCEmail": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/EmailTrigger"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/AzureKeyVault')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureKeyVault",
+				"typeProperties": {
+					"baseUrl": "[parameters('AzureKeyVault_properties_typeProperties_baseUrl')]"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/HttpLinkAnonymous')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"parameters": {
+					"url": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "HttpServer",
+				"typeProperties": {
+					"url": "[parameters('HttpLinkAnonymous_properties_typeProperties_url')]",
+					"enableServerCertificateValidation": false,
+					"authenticationType": "Anonymous"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/REST_Anonymous')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"parameters": {
+					"url": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "RestService",
+				"typeProperties": {
+					"url": "[parameters('REST_Anonymous_properties_typeProperties_url')]",
+					"enableServerCertificateValidation": true,
+					"authenticationType": "Anonymous"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/synapse-operation')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "get-token",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "get-tenant",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "get-client-id",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "get-client-secret",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"url": {
+								"value": "https://login.microsoftonline.com/@{activity('get-tenant').output.value}/oauth2/token",
+								"type": "Expression"
+							},
+							"method": "POST",
+							"headers": {
+								"Content-Type": "application/x-www-form-urlencoded"
+							},
+							"body": {
+								"value": "grant_type=client_credentials&client_id=@{activity('get-client-id').output.value}&client_secret=@{activity('get-client-secret').output.value}&resource=https://management.azure.com",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "get-status",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "set-endpoint",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"url": {
+								"value": "@{variables('endpoint-url')}?api-version=2021-06-01",
+								"type": "Expression"
+							},
+							"method": "GET",
+							"headers": {
+								"authorization": {
+									"value": "Bearer @{variables('token')}",
+									"type": "Expression"
+								}
+							},
+							"body": "\"\""
+						}
+					},
+					{
+						"name": "if-different-status",
+						"type": "IfCondition",
+						"dependsOn": [
+							{
+								"activity": "set-status",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@or(\nand(equals(variables('status'), 'Paused'), equals(pipeline().parameters.operation, 'pause'))\n,and(equals(variables('status'), 'Online'), equals(pipeline().parameters.operation, 'resume')))",
+								"type": "Expression"
+							},
+							"ifFalseActivities": [
+								{
+									"name": "synapse-operation",
+									"type": "WebActivity",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"url": {
+											"value": "@{variables('endpoint-url')}/@{pipeline().parameters.operation}?api-version=2021-06-01",
+											"type": "Expression"
+										},
+										"method": "POST",
+										"headers": {
+											"authorization": {
+												"value": "Bearer @{variables('token')}",
+												"type": "Expression"
+											}
+										},
+										"body": "\"\""
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "set-status",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "get-status",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "status",
+							"value": {
+								"value": "@activity('get-status').output.properties.status",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "set-token",
+						"description": "",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "get-token",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "token",
+							"value": {
+								"value": "@activity('get-token').output.access_token",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "get-tenant",
+						"type": "WebActivity",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"url": {
+								"value": "https://@{pipeline().globalParameters.keyVaultName}.vault.azure.net/secrets/TenantID?api-version=7.0",
+								"type": "Expression"
+							},
+							"method": "GET",
+							"headers": {},
+							"linkedServices": [
+								{
+									"referenceName": "AzureKeyVault",
+									"type": "LinkedServiceReference"
+								}
+							],
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://vault.azure.net"
+							}
+						}
+					},
+					{
+						"name": "get-client-id",
+						"type": "WebActivity",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"url": {
+								"value": "https://@{pipeline().globalParameters.keyVaultName}.vault.azure.net/secrets/Service-Principal-ApplicationID?api-version=7.0",
+								"type": "Expression"
+							},
+							"method": "GET",
+							"headers": {},
+							"linkedServices": [
+								{
+									"referenceName": "AzureKeyVault",
+									"type": "LinkedServiceReference"
+								}
+							],
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://vault.azure.net"
+							}
+						}
+					},
+					{
+						"name": "get-client-secret",
+						"type": "WebActivity",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"url": {
+								"value": "https://@{pipeline().globalParameters.keyVaultName}.vault.azure.net/secrets/Service-Principal-Secret?api-version=7.0",
+								"type": "Expression"
+							},
+							"method": "GET",
+							"headers": {},
+							"linkedServices": [
+								{
+									"referenceName": "AzureKeyVault",
+									"type": "LinkedServiceReference"
+								}
+							],
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://vault.azure.net"
+							}
+						}
+					},
+					{
+						"name": "get-subscription-id",
+						"type": "WebActivity",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"url": {
+								"value": "https://@{pipeline().globalParameters.keyVaultName}.vault.azure.net/secrets/Subscription-ID?api-version=7.0",
+								"type": "Expression"
+							},
+							"method": "GET",
+							"headers": {},
+							"linkedServices": [
+								{
+									"referenceName": "AzureKeyVault",
+									"type": "LinkedServiceReference"
+								}
+							],
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://vault.azure.net"
+							}
+						}
+					},
+					{
+						"name": "get-resource-group-name",
+						"type": "WebActivity",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"url": {
+								"value": "https://@{pipeline().globalParameters.keyVaultName}.vault.azure.net/secrets/Resource-Group-Name?api-version=7.0",
+								"type": "Expression"
+							},
+							"method": "GET",
+							"headers": {},
+							"linkedServices": [
+								{
+									"referenceName": "AzureKeyVault",
+									"type": "LinkedServiceReference"
+								}
+							],
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://vault.azure.net"
+							}
+						}
+					},
+					{
+						"name": "set-endpoint",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "set-token",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "get-subscription-id",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "get-resource-group-name",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "get-synapse-instance",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "endpoint-url",
+							"value": {
+								"value": "https://management.azure.com/subscriptions/@{activity('get-subscription-id').output.value}/resourceGroups/@{activity('get-resource-group-name').output.value}/providers/Microsoft.Synapse/workspaces/@{split(split(split(activity('get-synapse-instance').output.value, 'data source=')[1], ';')[0], '.')[0]}/sqlPools/@{split(split(split(activity('get-synapse-instance').output.value, 'initial catalog=')[1], ';')[0], '.')[0]}",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "get-synapse-instance",
+						"type": "WebActivity",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"url": {
+								"value": "https://@{pipeline().globalParameters.keyVaultName}.vault.azure.net/secrets/ADF-Synase-EDW-PRES?api-version=7.0",
+								"type": "Expression"
+							},
+							"method": "GET",
+							"headers": {},
+							"linkedServices": [
+								{
+									"referenceName": "AzureKeyVault",
+									"type": "LinkedServiceReference"
+								}
+							],
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://vault.azure.net"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"operation": {
+						"type": "string"
+					}
+				},
+				"variables": {
+					"status": {
+						"type": "String"
+					},
+					"token": {
+						"type": "String"
+					},
+					"endpoint-url": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/Management/Synapse"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureKeyVault')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/HTTP_Binary')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "HttpLinkAnonymous",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"url": {
+							"value": "@dataset().httpUrl",
+							"type": "Expression"
+						}
+					}
+				},
+				"parameters": {
+					"httpUrl": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/HTTP"
+				},
+				"annotations": [],
+				"type": "Binary",
+				"typeProperties": {
+					"location": {
+						"type": "HttpServerLocation"
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/HttpLinkAnonymous')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/REST_Binary')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "REST_Anonymous",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"url": {
+							"value": "@dataset().url",
+							"type": "Expression"
+						}
+					}
+				},
+				"parameters": {
+					"url": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/REST"
+				},
+				"annotations": [],
+				"type": "RestResource",
+				"typeProperties": {},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/REST_Anonymous')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/AmazonS3')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"parameters": {
+					"systemName": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "AmazonS3",
+				"typeProperties": {
+					"serviceUrl": "",
+					"accessKeyId": "[parameters('AmazonS3_properties_typeProperties_accessKeyId')]",
+					"secretAccessKey": {
+						"type": "AzureKeyVaultSecret",
+						"store": {
+							"referenceName": "AzureKeyVault",
+							"type": "LinkedServiceReference"
+						},
+						"secretName": {
+							"value": "@concat(linkedService().systemName, '-SecretAccessKey-KVSecret')",
+							"type": "Expression"
+						}
+					},
+					"authenticationType": "AccessKey"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureKeyVault')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/AzureDataLakeStorage')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureBlobFS",
+				"typeProperties": {
+					"url": "[parameters('AzureDataLakeStorage_properties_typeProperties_url')]",
+					"accountKey": {
+						"type": "AzureKeyVaultSecret",
+						"store": {
+							"referenceName": "AzureKeyVault",
+							"type": "LinkedServiceReference"
+						},
+						"secretName": "ADF-DataLake-Key"
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureKeyVault')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/AzureDatabricks_defaultCluster')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"type": "AzureDatabricks",
+				"annotations": [],
+				"typeProperties": {
+					"domain": "https://australiaeast.azuredatabricks.net",
+					"accessToken": {
+						"type": "AzureKeyVaultSecret",
+						"store": {
+							"referenceName": "AzureKeyVault",
+							"type": "LinkedServiceReference"
+						},
+						"secretName": "Databricks-PAT"
+					},
+					"existingClusterId": {
+						"type": "AzureKeyVaultSecret",
+						"store": {
+							"referenceName": "AzureKeyVault",
+							"type": "LinkedServiceReference"
+						},
+						"secretName": "Databricks-ClusterId"
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureKeyVault')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/AzureSqlDatabase_Ctrldb')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "ETL Control database linked service",
+				"annotations": [],
+				"type": "AzureSqlDatabase",
+				"typeProperties": {
+					"connectionString": {
+						"type": "AzureKeyVaultSecret",
+						"store": {
+							"referenceName": "AzureKeyVault",
+							"type": "LinkedServiceReference"
+						},
+						"secretName": "[parameters('AzureSqlDatabase_Ctrldb_properties_typeProperties_connectionString_secretName')]"
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureKeyVault')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/SFTP_Basic')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"type": "Sftp",
+				"annotations": [],
+				"typeProperties": {
+					"host": "[parameters('SFTP_Basic_properties_typeProperties_host')]",
+					"port": 22,
+					"skipHostKeyValidation": true,
+					"authenticationType": "Basic",
+					"userName": "[parameters('SFTP_Basic_properties_typeProperties_userName')]",
+					"password": {
+						"type": "AzureKeyVaultSecret",
+						"store": {
+							"referenceName": "AzureKeyVault",
+							"type": "LinkedServiceReference"
+						},
+						"secretName": "Preceda-SFTP-Password"
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureKeyVault')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/SQLServer')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"parameters": {
+					"kvSecret": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "SqlServer",
+				"typeProperties": {
+					"connectionString": {
+						"type": "AzureKeyVaultSecret",
+						"store": {
+							"referenceName": "AzureKeyVault",
+							"type": "LinkedServiceReference"
+						},
+						"secretName": {
+							"value": "[parameters('SQLServer_properties_typeProperties_connectionString_secretName')]",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureKeyVault')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/log-message')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "log-copy",
+						"type": "SqlServerStoredProcedure",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"storedProcedureName": "[[dbo].[LogMessage]",
+							"storedProcedureParameters": {
+								"ID": {
+									"value": {
+										"value": "@pipeline().parameters.ID",
+										"type": "Expression"
+									},
+									"type": "Int32"
+								},
+								"ActivityType": {
+									"value": {
+										"value": "@pipeline().parameters.ActivityType",
+										"type": "Expression"
+									},
+									"type": "String"
+								},
+								"Message": {
+									"value": {
+										"value": "@pipeline().parameters.Message",
+										"type": "Expression"
+									},
+									"type": "String"
+								},
+								"IsTransform": {
+									"value": {
+										"value": "@pipeline().parameters.IsTransform",
+										"type": "Expression"
+									},
+									"type": "Boolean"
+								}
+							}
+						},
+						"linkedServiceName": {
+							"referenceName": "AzureSqlDatabase_Ctrldb",
+							"type": "LinkedServiceReference"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"ID": {
+						"type": "int"
+					},
+					"ActivityType": {
+						"type": "string"
+					},
+					"Message": {
+						"type": "string"
+					},
+					"IsTransform": {
+						"type": "bool"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/Common/Logging"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureSqlDatabase_Ctrldb')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/log-status-update')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "log-status-update",
+						"type": "SqlServerStoredProcedure",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"storedProcedureName": "[[dbo].[StatusUpdate]",
+							"storedProcedureParameters": {
+								"ID": {
+									"value": {
+										"value": "@pipeline().parameters.ID",
+										"type": "Expression"
+									},
+									"type": "Int32"
+								},
+								"Property": {
+									"value": {
+										"value": "@pipeline().parameters.Property",
+										"type": "Expression"
+									},
+									"type": "String"
+								},
+								"Value": {
+									"value": {
+										"value": "@pipeline().parameters.Value",
+										"type": "Expression"
+									},
+									"type": "String"
+								},
+								"TableName": {
+									"value": {
+										"value": "@pipeline().parameters.TableName",
+										"type": "Expression"
+									},
+									"type": "String"
+								}
+							}
+						},
+						"linkedServiceName": {
+							"referenceName": "AzureSqlDatabase_Ctrldb",
+							"type": "LinkedServiceReference"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"ID": {
+						"type": "int"
+					},
+					"Property": {
+						"type": "string"
+					},
+					"Value": {
+						"type": "string"
+					},
+					"TableName": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/Common/Logging"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureSqlDatabase_Ctrldb')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DLS_Binary')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureDataLakeStorage",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"filePath": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/DLS"
+				},
+				"annotations": [],
+				"type": "Binary",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileName": {
+							"value": "@dataset().filePath",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureDataLakeStorage')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DLS_Binary_Folder')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureDataLakeStorage",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"folderPath": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/DLS"
+				},
+				"annotations": [],
+				"type": "Binary",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileSystem": {
+							"value": "@dataset().folderPath",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureDataLakeStorage')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DLS_Csv')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureDataLakeStorage",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"filePath": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/DLS"
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileName": {
+							"value": "@dataset().filePath",
+							"type": "Expression"
+						}
+					},
+					"columnDelimiter": ",",
+					"escapeChar": "\\",
+					"firstRowAsHeader": {
+						"value": "@bool(true)",
+						"type": "Expression"
+					},
+					"quoteChar": "\""
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureDataLakeStorage')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DLS_Excel_index')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureDataLakeStorage",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"filePath": {
+						"type": "string"
+					},
+					"sheetIndex": {
+						"type": "int",
+						"defaultValue": 0
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/DLS"
+				},
+				"annotations": [],
+				"type": "Excel",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileName": {
+							"value": "@dataset().filePath",
+							"type": "Expression"
+						}
+					},
+					"sheetIndex": {
+						"value": "@dataset().sheetIndex",
+						"type": "Expression"
+					},
+					"firstRowAsHeader": true
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureDataLakeStorage')]"
+			]
+		}
+	]
+}

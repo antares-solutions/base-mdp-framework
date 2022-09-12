@@ -1,0 +1,36 @@
+{
+	"name": "SFTP_Basic",
+	"properties": {
+		"annotations": [],
+		"type": "Sftp",
+		"typeProperties": {
+			"host": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "AzureKeyVault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "Preceda-SFTP-Host"
+			},
+			"port": 22,
+			"skipHostKeyValidation": true,
+			"authenticationType": "Basic",
+			"userName": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "AzureKeyVault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "Preceda-SFTP-Username"
+			},
+			"password": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "AzureKeyVault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "Preceda-SFTP-Password"
+			}
+		}
+	}
+}

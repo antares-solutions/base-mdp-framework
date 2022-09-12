@@ -1,0 +1,406 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+
+  "parameters": {
+    "ServicePrincipal-ObjectID": {
+      "type": "string",
+      "metadata": {
+        "description": "SP Object ID"
+      }
+    },
+    "ServicePrincipal-ApplicationID": {
+      "type": "string",
+      "metadata": {
+        "description": "SP AppID"
+      }
+    },
+    "ServicePrincipal-Secret": {
+      "type": "string",
+      "metadata": {
+        "description": "SP App Secret"
+      }
+    },
+    "AAD-Group-ObjectID": {
+      "type": "string",
+      "metadata": {
+        "description": "Group Object ID"
+      }
+    },
+    "AzureDatabricks-ObjectID": {
+      "type": "string",
+      "metadata": {
+        "description": "AzureDatabricks Object ID"
+      }
+    },
+    "AzureSqlServerName": {
+      "type": "string",
+      "metadata": {
+        "description": "SQL Server Name"
+      }
+    },
+    "dbUsername": {
+      "type": "string",
+      "metadata": {
+        "description": "Database Username"
+      }
+    },
+    "dbPassword": {
+      "type": "string",
+      "metadata": {
+        "description": "Database Password"
+      }
+    },
+    "dataLakeName": {
+      "type": "string",
+      "metadata": {
+        "description": "Data Lake Name"
+      }
+    },
+    "dataFactoryName": {
+      "type": "string",
+      "metadata": {
+        "description": "Data Factory Name"
+      }
+    },
+    "keyVaultName": {
+      "type": "string",
+      "metadata": {
+        "description": "Key Vault Name"
+      }
+    },
+    "databricksWorkspaceName": {
+      "type": "string",
+      "metadata": {
+        "description": "Databricks Name"
+      }
+    },
+    "synapseWorkspaceName": {
+      "type": "string",
+      "metadata": {
+        "description": "Synapse Name"
+      }
+    }
+  },
+
+  "variables": {
+    "location": "[resourceGroup().location]",
+    "tenantId": "[subscription().tenantId]",
+    "use-synapse": "[not(empty(parameters('synapseWorkspaceName')))]",
+    "synapse-name": "[if(not(empty(parameters('synapseWorkspaceName'))), parameters('synapseWorkspaceName'), 'blanksynapse')]"
+  },
+
+  "resources": [
+    {
+      "name": "[parameters('AzureSqlServerName')]",
+      "type": "Microsoft.Sql/servers",
+      "location": "[variables('location')]",
+      "apiVersion": "2015-05-01-preview",
+      "tags": {
+        "displayName": "Databases"
+      },
+      "resources": [
+        {
+          "name": "ControlDB",
+          "type": "databases",
+          "location": "[variables('location')]",
+          "apiVersion": "2014-04-01-preview",
+          "dependsOn": [
+            "[resourceId('Microsoft.Sql/servers', parameters('AzureSqlServerName'))]"
+          ],
+          "tags": {
+            "displayName": "ControlDB"
+          },
+          "properties": {
+            "collation": "SQL_Latin1_General_CP1_CI_AS",
+            "edition": "Basic",
+            "maxSizeBytes": "2147483648",
+            "requestedServiceObjectiveName": "Basic"
+          }
+        }
+      ]
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "name": "[parameters('dataLakeName')]",
+      "apiVersion": "2018-07-01",
+      "location": "[variables('location')]",
+      "sku": {
+        "name": "Standard_LRS",
+        "tier": "Standard"
+      },
+      "tags": {
+        "displayName": "Data Lake"
+      },
+      "resources": [
+        {
+          "name": "default/raw",
+          "type": "blobServices/containers",
+          "apiVersion": "2018-07-01",
+          "dependsOn": [
+            "[parameters('dataLakeName')]"
+          ],
+          "tags": {
+            "displayName": "raw"
+          }
+        },
+        {
+          "name": "default/trusted",
+          "type": "blobServices/containers",
+          "apiVersion": "2018-07-01",
+          "dependsOn": [
+            "[parameters('dataLakeName')]"
+          ],
+          "tags": {
+            "displayName": "trusted"
+          }
+        },
+        {
+          "name": "default/curated",
+          "type": "blobServices/containers",
+          "apiVersion": "2018-07-01",
+          "dependsOn": [
+            "[parameters('dataLakeName')]"
+          ],
+          "tags": {
+            "displayName": "curated"
+          }
+        }
+      ]
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults",
+      "name": "[parameters('keyVaultName')]",
+      "location": "[variables('location')]",
+      "apiVersion": "2018-02-14",
+      "tags": {
+        "displayName": "Key Vault"
+      },
+      "properties": {
+        "enabledForDeployment": "true",
+        "enabledForTemplateDeployment": "true",
+        "tenantId": "[variables('tenantId')]",
+        "accessPolicies": [
+          {
+            "objectId": "[parameters('AAD-Group-ObjectID')]",
+            "tenantId": "[variables('tenantId')]",
+            "permissions": {
+              "secrets": [ "get", "list", "set", "delete" ]
+            }
+          },
+          {
+            "objectId": "[parameters('AzureDatabricks-ObjectID')]",
+            "tenantId": "[variables('tenantId')]",
+            "permissions": {
+              "secrets": [ "get", "list" ]
+            }
+          },
+          {
+            "objectId": "[parameters('ServicePrincipal-ObjectID')]",
+            "tenantId": "[variables('tenantId')]",
+            "permissions": {
+              "secrets": [ "get", "list", "set" ]
+            }
+          },
+          {
+            "objectId": "[reference(concat('Microsoft.DataFactory/factories/', parameters('dataFactoryName')), '2018-06-01', 'Full').identity.principalId]",
+            "tenantId": "[variables('tenantId')]",
+            "permissions": {
+              "secrets": [ "get" ]
+            }
+          }
+        ],
+        "sku": {
+          "name": "Standard",
+          "family": "A"
+        },
+        "networkAcls": {
+          "value": {
+            "defaultAction": "Allow",
+            "bypass": "AzureServices"
+          }
+        },
+        "dependsOn": [
+          "[concat('Microsoft.DataFactory/factories/', parameters('dataFactoryName'))]"
+        ]
+      },
+      "resources": [
+        {
+          "type": "Microsoft.KeyVault/vaults/secrets",
+          "name": "[concat(parameters('keyVaultName'), '/', 'ADF-ControlDB')]",
+          "apiVersion": "2018-02-14",
+          "location": "[variables('location')]",
+          "dependsOn": [
+            "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]"
+          ],
+          "properties": {
+            "value": "[concat('integrated security=False;encrypt=True;connection timeout=30;data source=', parameters('AzureSqlServerName'), '.database.windows.net;initial catalog=ControlDB;user id=', parameters('dbUsername'), ';password=', parameters('dbPassword'))]"
+          },
+          "tags": {
+            "displayName": "ADF-ControlDB"
+          }
+        },
+        {
+          "type": "Microsoft.KeyVault/vaults/secrets",
+          "name": "[concat(parameters('keyVaultName'), '/', 'ADF-Synase-EDW-PRES')]",
+          "apiVersion": "2018-02-14",
+          "condition": "[variables('use-synapse')]",
+          "location": "[variables('location')]",
+          "dependsOn": [
+            "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]"
+          ],
+          "properties": {
+            "value": "[concat('integrated security=False;encrypt=True;connection timeout=30;data source=', parameters('synapseWorkspaceName'), '.sql.azuresynapse.net;initial catalog=EDW_PRES;user id=', parameters('dbUsername'), ';password=', parameters('dbPassword'))]"
+          },
+          "tags": {
+            "displayName": "ADF-Synase-EDW-PRES"
+          }
+        },
+        {
+          "type": "Microsoft.KeyVault/vaults/secrets",
+          "name": "[concat(parameters('keyVaultName'), '/', 'ADF-DataLake-Key')]",
+          "apiVersion": "2018-02-14",
+          "location": "[variables('location')]",
+          "dependsOn": [
+            "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]",
+            "[resourceId('Microsoft.Storage/storageAccounts', parameters('dataLakeName'))]"
+          ],
+          "properties": {
+            "value": "[listKeys(resourceId('Microsoft.Storage/storageAccounts', parameters('dataLakeName')), '2019-04-01').keys[0].value]"
+
+          },
+          "tags": {
+            "displayName": "ADF-DataLake-Key"
+          }
+        },
+        {
+          "type": "Microsoft.KeyVault/vaults/secrets",
+          "name": "[concat(parameters('keyVaultName'), '/', 'DL-FQN')]",
+          "apiVersion": "2018-02-14",
+          "location": "[variables('location')]",
+          "dependsOn": [
+            "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]"
+          ],
+          "properties": {
+            "value": "[concat(parameters('dataLakeName'), '.dfs.core.windows.net')]"
+          },
+          "tags": {
+            "displayName": "DL-FQN"
+          }
+        },
+        {
+          "type": "Microsoft.KeyVault/vaults/secrets",
+          "name": "[concat(parameters('keyVaultName'), '/', 'DL-Path-Raw')]",
+          "apiVersion": "2018-02-14",
+          "location": "[variables('location')]",
+          "dependsOn": [
+            "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]"
+          ],
+          "properties": {
+            "value": "[concat('abfss://raw@', parameters('dataLakeName'), '.dfs.core.windows.net/')]"
+          },
+          "tags": {
+            "displayName": "DL-Path-Raw"
+          }
+        },
+        {
+          "type": "Microsoft.KeyVault/vaults/secrets",
+          "name": "[concat(parameters('keyVaultName'), '/', 'JDBC-SQL-ControlDB')]",
+          "apiVersion": "2018-02-14",
+          "location": "[variables('location')]",
+          "dependsOn": [
+            "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]"
+          ],
+          "properties": {
+            "value": "[concat('jdbc:sqlserver://', parameters('AzureSqlServerName'), '.database.windows.net;DatabaseName=ControlDB;user=', parameters('dbUsername'), ';password=', parameters('dbPassword'))]"
+          },
+          "tags": {
+            "displayName": "JDBC-SQL-ControlDB"
+          }
+        },
+        {
+          "type": "Microsoft.KeyVault/vaults/secrets",
+          "name": "[concat(parameters('keyVaultName'), '/', 'JDBC-Synase-EDW-PRES')]",
+          "apiVersion": "2018-02-14",
+          "condition": "[variables('use-synapse')]",
+          "location": "[variables('location')]",
+          "dependsOn": [
+            "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]"
+          ],
+          "properties": {
+            "value": "[concat('jdbc:sqlserver://', parameters('synapseWorkspaceName'), '.sql.azuresynapse.net;DatabaseName=EDW_PRES;user=', parameters('dbUsername'), ';password=', parameters('dbPassword'))]"
+          },
+          "tags": {
+            "displayName": "JDBC-Synase-EDW-PRES"
+          }
+        },
+        {
+          "type": "Microsoft.KeyVault/vaults/secrets",
+          "name": "[concat(parameters('keyVaultName'), '/', 'Service-Principal-ApplicationID')]",
+          "apiVersion": "2018-02-14",
+          "location": "[variables('location')]",
+          "dependsOn": [
+            "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]"
+          ],
+          "properties": {
+            "value": "[parameters('ServicePrincipal-ApplicationID')]"
+          },
+          "tags": {
+            "displayName": "Service-Principal-ApplicationID"
+          }
+        },
+        {
+          "type": "Microsoft.KeyVault/vaults/secrets",
+          "name": "[concat(parameters('keyVaultName'), '/', 'Service-Principal-Secret')]",
+          "apiVersion": "2018-02-14",
+          "location": "[variables('location')]",
+          "dependsOn": [
+            "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]"
+          ],
+          "properties": {
+            "value": "[parameters('ServicePrincipal-Secret')]"
+          },
+          "tags": {
+            "displayName": "Service-Principal-Secret"
+          }
+        },
+        {
+          "type": "Microsoft.KeyVault/vaults/secrets",
+          "name": "[concat(parameters('keyVaultName'), '/', 'TenantID')]",
+          "apiVersion": "2018-02-14",
+          "location": "[variables('location')]",
+          "dependsOn": [
+            "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]"
+          ],
+          "properties": {
+            "value": "[variables('tenantId')]"
+          },
+          "tags": {
+            "displayName": "TenantID"
+          }
+        }
+      ]
+    },
+    {
+      "name": "[concat(variables('synapse-name'), '/EDW_PRES')]",
+      "type": "Microsoft.Synapse/workspaces/sqlPools",
+      "location": "[variables('location')]",
+      "apiVersion": "2021-04-01-preview",
+      "condition": "[variables('use-synapse')]",
+      "tags": {
+        "displayName": "Synapse Analytics / EDW_PRES"
+      },
+      "sku": {
+        "name": "DW100c",
+        "capacity": 0
+      },
+      "properties": {
+        "status": "Paused",
+        "maxSizeBytes": 263882790666240,
+        "collation": "SQL_Latin1_General_CP1_CI_AS"
+      }
+    }
+  ],
+  "outputs": {
+  }
+}

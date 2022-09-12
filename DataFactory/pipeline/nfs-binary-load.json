@@ -1,0 +1,351 @@
+{
+	"name": "nfs-binary-load",
+	"properties": {
+		"activities": [
+			{
+				"name": "set-source-file-path",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "SourceFilePath",
+					"value": {
+						"value": "@pipeline().parameters.task.SourceQuery",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "set-output-full-path",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "OutputFullPath",
+					"value": {
+						"value": "@replace(replace(replace(replace(replace(replace(\npipeline().parameters.task.RawPath\n,'$yyyy$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'yyyy'))\n,'$MM$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'MM'))\n,'$dd$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'dd'))\n,'$HH$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'HH'))\n,'$mm$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'mm'))\n,'$guid$', guid())",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "if-file-exists",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "set-output-full-path",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "file-exists",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@bool(activity('file-exists').output.exists)",
+						"type": "Expression"
+					},
+					"ifFalseActivities": [
+						{
+							"name": "task-raw-path-skipped",
+							"type": "ExecutePipeline",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "log-status-update",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": false,
+								"parameters": {
+									"ID": {
+										"value": "@pipeline().parameters.task.ID",
+										"type": "Expression"
+									},
+									"Property": "RawPath",
+									"Value": "Skipped"
+								}
+							}
+						}
+					],
+					"ifTrueActivities": [
+						{
+							"name": "copy-nfs-binary-load",
+							"type": "Copy",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [
+								{
+									"name": "Destination",
+									"value": "raw/Cewa Financials/"
+								}
+							],
+							"typeProperties": {
+								"source": {
+									"type": "BinarySource",
+									"storeSettings": {
+										"type": "FileServerReadSettings",
+										"recursive": true
+									},
+									"formatSettings": {
+										"type": "BinaryReadSettings"
+									}
+								},
+								"sink": {
+									"type": "BinarySink",
+									"storeSettings": {
+										"type": "AzureBlobFSWriteSettings"
+									}
+								},
+								"enableStaging": false
+							},
+							"inputs": [
+								{
+									"referenceName": "NFS_Binary",
+									"type": "DatasetReference",
+									"parameters": {
+										"systemName": {
+											"value": "@pipeline().parameters.task.SourceKeyVaultSecret",
+											"type": "Expression"
+										},
+										"filePath": {
+											"value": "@variables('SourceFilePath')",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "DLS_Binary",
+									"type": "DatasetReference",
+									"parameters": {
+										"filePath": {
+											"value": "@variables('OutputFullPath')",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"name": "task-raw-path",
+							"type": "ExecutePipeline",
+							"dependsOn": [
+								{
+									"activity": "copy-nfs-binary-load",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "log-status-update",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": false,
+								"parameters": {
+									"ID": {
+										"value": "@pipeline().parameters.task.ID",
+										"type": "Expression"
+									},
+									"Property": "RawPath",
+									"Value": {
+										"value": "@variables('OutputFullPath')",
+										"type": "Expression"
+									}
+								}
+							}
+						},
+						{
+							"name": "log-copy",
+							"type": "ExecutePipeline",
+							"dependsOn": [
+								{
+									"activity": "copy-nfs-binary-load",
+									"dependencyConditions": [
+										"Completed"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "log-message",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": false,
+								"parameters": {
+									"ID": {
+										"value": "@pipeline().parameters.task.ID",
+										"type": "Expression"
+									},
+									"ActivityType": "copy-data",
+									"Message": {
+										"value": "@{activity('copy-nfs-binary-load')}",
+										"type": "Expression"
+									}
+								}
+							}
+						},
+						{
+							"name": "set-done",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "copy-nfs-binary-load",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "Done",
+								"value": true
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "file-exists",
+				"type": "GetMetadata",
+				"dependsOn": [
+					{
+						"activity": "set-source-file-path",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "NFS_Binary",
+						"type": "DatasetReference",
+						"parameters": {
+							"systemName": {
+								"value": "@pipeline().parameters.task.SourceKeyVaultSecret",
+								"type": "Expression"
+							},
+							"filePath": {
+								"value": "@variables('SourceFilePath')",
+								"type": "Expression"
+							}
+						}
+					},
+					"fieldList": [
+						"exists"
+					],
+					"storeSettings": {
+						"type": "FileServerReadSettings",
+						"enablePartitionDiscovery": false
+					},
+					"formatSettings": {
+						"type": "BinaryReadSettings"
+					}
+				}
+			},
+			{
+				"name": "if-delete-file",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "if-file-exists",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@and(variables('DeleteFile'), variables('Done'))",
+						"type": "Expression"
+					},
+					"ifTrueActivities": [
+						{
+							"name": "delete-nfs-file",
+							"type": "Delete",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"dataset": {
+									"referenceName": "NFS_Binary",
+									"type": "DatasetReference",
+									"parameters": {
+										"systemName": {
+											"value": "@pipeline().parameters.task.SourceKeyVaultSecret",
+											"type": "Expression"
+										},
+										"filePath": "@variables('SourceFilePath')"
+									}
+								},
+								"enableLogging": false,
+								"storeSettings": {
+									"type": "FileServerReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								}
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"task": {
+				"type": "object"
+			}
+		},
+		"variables": {
+			"OutputFullPath": {
+				"type": "String"
+			},
+			"SourceFilePath": {
+				"type": "String"
+			},
+			"DeleteFile": {
+				"type": "Boolean",
+				"defaultValue": false
+			},
+			"Done": {
+				"type": "Boolean",
+				"defaultValue": false
+			}
+		},
+		"folder": {
+			"name": "ELT-Framework/SourceHandler/NFS"
+		},
+		"annotations": []
+	}
+}

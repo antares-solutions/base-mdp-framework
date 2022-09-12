@@ -1,0 +1,685 @@
+{
+	"name": "sql-load",
+	"properties": {
+		"activities": [
+			{
+				"name": "set-base-query",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "BaseQuery",
+					"value": {
+						"value": "@coalesce(pipeline().parameters.task.SourceQuery, \nreplace(replace('SELECT * FROM [$A$].[$B$]'\n,'$A$'\n,pipeline().parameters.task.SourceSchema)\n,'$B$'\n,pipeline().parameters.task.SourceTableName)\n)",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "row-count",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "set-query",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "set-full-path",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "SqlServerSource",
+						"sqlReaderQuery": {
+							"value": "SELECT COUNT(*) [RowCount] FROM (@{variables('Query')}) T",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "SQL_Server",
+						"type": "DatasetReference",
+						"parameters": {
+							"kvSecret": "@pipeline().parameters.task.SourceKeyVaultSecret"
+						}
+					}
+				}
+			},
+			{
+				"name": "set-full-path",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "OutputFullPath",
+					"value": {
+						"value": "@replace(replace(replace(replace(replace(replace(\ncoalesce(pipeline().parameters.task.RawPath, '')\n,'$yyyy$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'yyyy'))\n,'$MM$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'MM'))\n,'$dd$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'dd'))\n,'$HH$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'HH'))\n,'$mm$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'mm'))\n,'$guid$', guid())",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "set-query",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "if-delta",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "Query",
+					"value": {
+						"value": "@if(variables('IsDelta')\n,replace(replace(\n'SELECT * FROM ($Q$) T $W$'\n,'$Q$', variables('BaseQuery'))\n,'$W$', variables('QueryClause'))\n,variables('BaseQuery'))",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "if-delta",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "set-base-query",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "set-is-delta",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@variables('IsDelta')",
+						"type": "Expression"
+					},
+					"ifTrueActivities": [
+						{
+							"name": "low-high-watermark",
+							"type": "Lookup",
+							"dependsOn": [
+								{
+									"activity": "set-watermark-column",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "SqlServerSource",
+									"sqlReaderQuery": {
+										"value": "@replace(replace(replace(\n'SELECT COALESCE($PLW$, MIN([$WC$])) [LowWatermark],  MAX([$WC$]) [HighWatermark] FROM ($Q$) T'\n,'$PLW$', if(empty(pipeline().parameters.task.LowWatermark), 'NULL', concat('''', pipeline().parameters.task.LowWatermark, '''')))\n,'$WC$', variables('WatermarkColumn'))\n,'$Q$', variables('BaseQuery'))",
+										"type": "Expression"
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"dataset": {
+									"referenceName": "SQL_Server",
+									"type": "DatasetReference",
+									"parameters": {
+										"kvSecret": "@pipeline().parameters.task.SourceKeyVaultSecret"
+									}
+								},
+								"firstRowOnly": true
+							}
+						},
+						{
+							"name": "set-watermark-column",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "WatermarkColumn",
+								"value": {
+									"value": "@pipeline().parameters.task.WatermarkColumn",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "set-query-clause",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "low-high-watermark",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "QueryClause",
+								"value": {
+									"value": "WHERE @{variables('WatermarkColumn')} > @{activity('low-high-watermark').output.firstRow.LowWatermark} AND @{variables('WatermarkColumn')} <= @{activity('low-high-watermark').output.firstRow.HighWatermark}",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "task-low-watermark",
+							"type": "ExecutePipeline",
+							"dependsOn": [
+								{
+									"activity": "low-high-watermark",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "log-status-update",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"ID": {
+										"value": "@pipeline().parameters.task.ID",
+										"type": "Expression"
+									},
+									"Property": "LowWatermark",
+									"Value": {
+										"value": "@{activity('low-high-watermark').output.firstRow.LowWatermark}",
+										"type": "Expression"
+									}
+								}
+							}
+						},
+						{
+							"name": "task-high-watermark",
+							"type": "ExecutePipeline",
+							"dependsOn": [
+								{
+									"activity": "low-high-watermark",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "log-status-update",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"ID": {
+										"value": "@pipeline().parameters.task.ID",
+										"type": "Expression"
+									},
+									"Property": "LowWatermark",
+									"Value": {
+										"value": "@{activity('low-high-watermark').output.firstRow.HighWatermark}",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "set-is-delta",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "IsDelta",
+					"value": {
+						"value": "@not(empty(pipeline().parameters.task.WatermarkColumn))",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "switch-copy-sql",
+				"type": "Switch",
+				"dependsOn": [
+					{
+						"activity": "task-source-row-count",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"on": {
+						"value": "@if(equals(length(split(pipeline().parameters.task.SourceHandler, '/')), 1), pipeline().parameters.task.SourceHandler, split(pipeline().parameters.task.SourceHandler, '/')[1])",
+						"type": "Expression"
+					},
+					"cases": [
+						{
+							"value": "sink-sql",
+							"activities": [
+								{
+									"name": "copy-sink-sql",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 3,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [
+										{
+											"name": "Destination",
+											"value": "raw/Cewa Financials/"
+										}
+									],
+									"typeProperties": {
+										"source": {
+											"type": "SqlServerSource",
+											"sqlReaderQuery": {
+												"value": "@variables('Query')",
+												"type": "Expression"
+											},
+											"queryTimeout": "02:00:00",
+											"partitionOption": "None"
+										},
+										"sink": {
+											"type": "SqlServerSink",
+											"preCopyScript": {
+												"value": "BEGIN TRY EXEC('TRUNCATE TABLE [@{pipeline().parameters.task.SourceSchema}].[@{pipeline().parameters.task.SourceTableName}]') END TRY BEGIN CATCH END CATCH",
+												"type": "Expression"
+											},
+											"writeBehavior": "insert",
+											"tableOption": "autoCreate"
+										},
+										"enableStaging": false
+									},
+									"inputs": [
+										{
+											"referenceName": "SQL_Server",
+											"type": "DatasetReference",
+											"parameters": {
+												"kvSecret": {
+													"value": "@pipeline().parameters.task.SourceKeyVaultSecret",
+													"type": "Expression"
+												}
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "SQL_Server_Table",
+											"type": "DatasetReference",
+											"parameters": {
+												"kvSecret": {
+													"value": "@json(pipeline().parameters.task.ExtendedProperties).TargetKeyVaultSecret",
+													"type": "Expression"
+												},
+												"schemaName": {
+													"value": "@pipeline().parameters.task.DestinationSchema",
+													"type": "Expression"
+												},
+												"tableName": {
+													"value": "@pipeline().parameters.task.DestinationTableName",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								},
+								{
+									"name": "sink-sql-task-sink-row-count",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "copy-sink-sql",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "log-status-update",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": false,
+										"parameters": {
+											"BatchID": {
+												"value": "@pipeline().parameters.task.BatchID",
+												"type": "Expression"
+											},
+											"SourceID": {
+												"value": "@pipeline().parameters.task.SourceID",
+												"type": "Expression"
+											},
+											"Property": "SinkRowCount",
+											"Value": {
+												"value": "@{activity('copy-sink-sql').output.rowsCopied}",
+												"type": "Expression"
+											}
+										}
+									}
+								},
+								{
+									"name": "sink-sql-log-copy",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "copy-sink-sql",
+											"dependencyConditions": [
+												"Completed"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "log-message",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": false,
+										"parameters": {
+											"BatchStatusID": {
+												"value": "@pipeline().parameters.task.ID",
+												"type": "Expression"
+											},
+											"ActivityType": "copy-data",
+											"Message": {
+												"value": "@{activity('copy-sink-sql')}",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						}
+					],
+					"defaultActivities": [
+						{
+							"name": "copy-sql",
+							"type": "Copy",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 3,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [
+								{
+									"name": "Destination",
+									"value": "raw/Cewa Financials/"
+								}
+							],
+							"typeProperties": {
+								"source": {
+									"type": "SqlServerSource",
+									"sqlReaderQuery": {
+										"value": "@variables('Query')",
+										"type": "Expression"
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"sink": {
+									"type": "ParquetSink",
+									"storeSettings": {
+										"type": "AzureBlobFSWriteSettings"
+									},
+									"formatSettings": {
+										"type": "ParquetWriteSettings"
+									}
+								},
+								"enableStaging": false
+							},
+							"inputs": [
+								{
+									"referenceName": "SQL_Server",
+									"type": "DatasetReference",
+									"parameters": {
+										"kvSecret": {
+											"value": "@pipeline().parameters.task.SourceKeyVaultSecret",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "DLS_Parquet",
+									"type": "DatasetReference",
+									"parameters": {
+										"BlobPath": {
+											"value": "@variables('OutputFullPath')",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"name": "task-raw-path",
+							"type": "ExecutePipeline",
+							"dependsOn": [
+								{
+									"activity": "copy-sql",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "log-status-update",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"ID": {
+										"value": "@pipeline().parameters.task.ID",
+										"type": "Expression"
+									},
+									"Property": "RawPath",
+									"Value": {
+										"value": "@variables('OutputFullPath')",
+										"type": "Expression"
+									}
+								}
+							}
+						},
+						{
+							"name": "task-sink-row-count",
+							"type": "ExecutePipeline",
+							"dependsOn": [
+								{
+									"activity": "copy-sql",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "log-status-update",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": false,
+								"parameters": {
+									"ID": {
+										"value": "@pipeline().parameters.task.ID",
+										"type": "Expression"
+									},
+									"Property": "SinkRowCount",
+									"Value": {
+										"value": "@{activity('copy-sql').output.rowsCopied}",
+										"type": "Expression"
+									}
+								}
+							}
+						},
+						{
+							"name": "log-copy",
+							"type": "ExecutePipeline",
+							"dependsOn": [
+								{
+									"activity": "copy-sql",
+									"dependencyConditions": [
+										"Completed"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "log-message",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": false,
+								"parameters": {
+									"ID": {
+										"value": "@pipeline().parameters.task.ID",
+										"type": "Expression"
+									},
+									"ActivityType": "copy-data",
+									"Message": {
+										"value": "@{activity('copy-sql')}",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "task-source-row-count",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "row-count",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "log-status-update",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"ID": {
+							"value": "@pipeline().parameters.task.ID",
+							"type": "Expression"
+						},
+						"Property": "SourceRowCount",
+						"Value": {
+							"value": "@{activity('row-count').output.firstRow.RowCount}",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "log-count",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "row-count",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "log-message",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": false,
+					"parameters": {
+						"ID": {
+							"value": "@pipeline().parameters.task.ID",
+							"type": "Expression"
+						},
+						"ActivityType": "row-count",
+						"Message": {
+							"value": "@{activity('row-count')}",
+							"type": "Expression"
+						}
+					}
+				}
+			}
+		],
+		"parameters": {
+			"task": {
+				"type": "object"
+			}
+		},
+		"variables": {
+			"Query": {
+				"type": "String"
+			},
+			"OutputFullPath": {
+				"type": "String"
+			},
+			"WatermarkColumn": {
+				"type": "String"
+			},
+			"BaseQuery": {
+				"type": "String"
+			},
+			"QueryClause": {
+				"type": "String"
+			},
+			"IsDelta": {
+				"type": "Boolean"
+			}
+		},
+		"folder": {
+			"name": "ELT-Framework/SourceHandler"
+		},
+		"annotations": [],
+		"lastPublishTime": "2021-07-08T10:40:24Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

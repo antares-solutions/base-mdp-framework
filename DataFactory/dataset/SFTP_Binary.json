@@ -1,0 +1,28 @@
+{
+	"name": "SFTP_Binary",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "SFTP_Basic",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"path": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "ELT-Framework/SFTP"
+		},
+		"annotations": [],
+		"type": "Binary",
+		"typeProperties": {
+			"location": {
+				"type": "SftpLocation",
+				"fileName": {
+					"value": "@dataset().path",
+					"type": "Expression"
+				}
+			}
+		}
+	}
+}

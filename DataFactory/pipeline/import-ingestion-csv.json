@@ -1,0 +1,184 @@
+{
+	"name": "import-ingestion-csv",
+	"properties": {
+		"activities": [
+			{
+				"name": "for-each-ingestion",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "import-file",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@take(activity('import-file').output.value, if(equals(int(activity('get-config').output.firstRow.Limit), 0), 999, int(activity('get-config').output.firstRow.Limit)))",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "add-ingestion",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[dbo].[AddIngestion]",
+								"storedProcedureParameters": {
+									"SystemCode": {
+										"value": {
+											"value": "@item().SystemCode",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Schema": {
+										"value": {
+											"value": "@item().TableSchema",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Table": {
+										"value": {
+											"value": "@item().TableName",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"Query": {
+										"value": {
+											"value": "@item().SourceQuery",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"WatermarkColumn": {
+										"value": {
+											"value": "@item().WatermarkColumn",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"SourceHandler": {
+										"value": {
+											"value": "@item().SourceHandler",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"RawFileExtension": {
+										"value": {
+											"value": "@item().RawFileExtension",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"KeyVaultSecret": {
+										"value": {
+											"value": "@item().KeyVaultSecret",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"ExtendedProperties": {
+										"value": {
+											"value": "@item().ExtendedProperties",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "AzureSqlDatabase_Ctrldb",
+								"type": "LinkedServiceReference"
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "import-file",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "get-config",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "DelimitedTextSource",
+						"storeSettings": {
+							"type": "AzureBlobFSReadSettings",
+							"recursive": true,
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "DelimitedTextReadSettings"
+						}
+					},
+					"dataset": {
+						"referenceName": "DLS_Csv",
+						"type": "DatasetReference",
+						"parameters": {
+							"filePath": "@activity('get-config').output.firstRow.Path"
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "get-config",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": "SELECT [Path], [Index], [Limit] FROM   \n( \n\tSELECT * FROM [dbo].[Config]\n\tWHERE [KeyGroup] = 'IngestionSheet'\n) T\nPIVOT(\n\tMAX([Value]) \n\tFOR [Key] IN (\n\t\t[Index], \n\t\t[Path],\n\t\t[Limit]\n\t)\n) T;",
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "SQL_ControlDB",
+						"type": "DatasetReference"
+					}
+				}
+			}
+		],
+		"folder": {
+			"name": "ELT-Framework/Setup"
+		},
+		"annotations": []
+	}
+}

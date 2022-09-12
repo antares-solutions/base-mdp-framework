@@ -1,0 +1,41 @@
+{
+	"name": "NetworkFileShare",
+	"properties": {
+		"type": "FileServer",
+		"parameters": {
+			"systemName": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"typeProperties": {
+			"host": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "AzureKeyVault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": {
+					"value": "@concat(linkedService().systemName, '-Host')",
+					"type": "Expression"
+				}
+			},
+			"userId": "antares-data.com.au\\shir01_svc",
+			"password": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "AzureKeyVault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": {
+					"value": "@concat(linkedService().systemName, '-Password')",
+					"type": "Expression"
+				}
+			}
+		},
+		"connectVia": {
+			"referenceName": "AU-SHIR",
+			"type": "IntegrationRuntimeReference"
+		}
+	}
+}

@@ -1,0 +1,130 @@
+{
+	"name": "update-source-metadata",
+	"properties": {
+		"activities": [
+			{
+				"name": "get-tables",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "SELECT [SourceID]\n,[SystemCode]\n,[SourceSchema]\n,[SourceTableName]\n,[SourceKeyVaultSecret]\nFROM [dbo].[ExtractLoadManifest]\nWHERE\nSourceHandler = 'sql-load'\nAND SystemCode = '@{pipeline().parameters.SystemCode}'",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "SQL_ControlDB",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "for-each-table",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "get-tables",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('get-tables').output.value",
+						"type": "Expression"
+					},
+					"isSequential": false,
+					"activities": [
+						{
+							"name": "execute-update-metadata",
+							"type": "ExecutePipeline",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "store-table-metadata",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"SchemaName": {
+										"value": "@item().SourceSchema",
+										"type": "Expression"
+									},
+									"TableName": {
+										"value": "@item().SourceTableName",
+										"type": "Expression"
+									},
+									"sourceKeyVaultKey": {
+										"value": "@item().SourceKeyVaultSecret",
+										"type": "Expression"
+									}
+								}
+							}
+						},
+						{
+							"name": "update-source-query",
+							"type": "Lookup",
+							"dependsOn": [
+								{
+									"activity": "execute-update-metadata",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderQuery": {
+										"value": "UPDATE R\nSET [SourceQuery] = S.[SelectSQL]\nFROM [dbo].[MetadataGenerated] S\nJOIN [dbo].[ExtractLoadManifest] R ON R.[SourceSchema] = S.[TableSchema] AND R.[SourceTableName] = S.[TableName]\nWHERE [SourceSchema]='@{item().SourceSchema}' AND [SourceTableName]='@{item().SourceTableName}';\nSELECT 1 A",
+										"type": "Expression"
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"dataset": {
+									"referenceName": "SQL_ControlDB",
+									"type": "DatasetReference"
+								},
+								"firstRowOnly": true
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"SystemCode": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "ELT-Framework/Setup/Metadata"
+		},
+		"annotations": []
+	}
+}

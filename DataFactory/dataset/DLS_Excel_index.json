@@ -1,0 +1,38 @@
+{
+	"name": "DLS_Excel_index",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "AzureDataLakeStorage",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"filePath": {
+				"type": "string"
+			},
+			"sheetIndex": {
+				"type": "int",
+				"defaultValue": 0
+			}
+		},
+		"folder": {
+			"name": "ELT-Framework/DLS"
+		},
+		"annotations": [],
+		"type": "Excel",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"fileName": {
+					"value": "@dataset().filePath",
+					"type": "Expression"
+				}
+			},
+			"sheetIndex": {
+				"value": "@dataset().sheetIndex",
+				"type": "Expression"
+			},
+			"firstRowAsHeader": true
+		},
+		"schema": []
+	}
+}

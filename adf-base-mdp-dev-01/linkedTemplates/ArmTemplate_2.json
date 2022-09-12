@@ -1,0 +1,2483 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"type": "string",
+			"metadata": "Data Factory name",
+			"defaultValue": "adf-base-mdp-dev-01"
+		}
+	},
+	"variables": {
+		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+	},
+	"resources": [
+		{
+			"name": "[concat(parameters('factoryName'), '/s3-binary-load')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "s3-folder-copy",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "set-output-full-path",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "set-source-file-path",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [
+							{
+								"name": "Destination",
+								"value": "raw/Cewa Financials/"
+							}
+						],
+						"typeProperties": {
+							"source": {
+								"type": "BinarySource",
+								"storeSettings": {
+									"type": "AmazonS3ReadSettings",
+									"recursive": true
+								},
+								"formatSettings": {
+									"type": "BinaryReadSettings"
+								}
+							},
+							"sink": {
+								"type": "BinarySink",
+								"storeSettings": {
+									"type": "AzureBlobFSWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "S3_Binary_Folder",
+								"type": "DatasetReference",
+								"parameters": {
+									"folderPath": {
+										"value": "@variables('SourceFilePath')",
+										"type": "Expression"
+									},
+									"s3KVSecret": {
+										"value": "@pipeline().parameters.task.SourceKeyVaultSecret",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DLS_Binary_Folder",
+								"type": "DatasetReference",
+								"parameters": {
+									"folderPath": {
+										"value": "@variables('OutputFullPath')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "set-source-file-path",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "SourceFilePath",
+							"value": {
+								"value": "@pipeline().parameters.task.SourceQuery",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "set-output-full-path",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "OutputFullPath",
+							"value": {
+								"value": "@replace(replace(replace(replace(replace(replace(\npipeline().parameters.task.RawPath\n,'$yyyy$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'yyyy'))\n,'$MM$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'MM'))\n,'$dd$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'dd'))\n,'$HH$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'HH'))\n,'$mm$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'mm'))\n,'$guid$', guid())",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "task-raw-path",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "s3-folder-copy",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "log-status-update",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"ID": {
+									"value": "@pipeline().parameters.task.ID",
+									"type": "Expression"
+								},
+								"Property": "RawPath",
+								"Value": {
+									"value": "@variables('OutputFullPath')",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "log-copy",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "s3-folder-copy",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "log-message",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"ID": {
+									"value": "@pipeline().parameters.task.ID",
+									"type": "Expression"
+								},
+								"ActivityType": "copy-data",
+								"Message": {
+									"value": "@{activity('s3-folder-copy')}",
+									"type": "Expression"
+								}
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"task": {
+						"type": "object"
+					}
+				},
+				"variables": {
+					"OutputFullPath": {
+						"type": "String"
+					},
+					"SourceFilePath": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/SourceHandler/S3"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/sql-load')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "set-base-query",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "BaseQuery",
+							"value": {
+								"value": "@coalesce(pipeline().parameters.task.SourceQuery, \nreplace(replace('SELECT * FROM [$A$].[$B$]'\n,'$A$'\n,pipeline().parameters.task.SourceSchema)\n,'$B$'\n,pipeline().parameters.task.SourceTableName)\n)",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "row-count",
+						"type": "Lookup",
+						"dependsOn": [
+							{
+								"activity": "set-query",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "set-full-path",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "SqlServerSource",
+								"sqlReaderQuery": {
+									"value": "SELECT COUNT(*) [RowCount] FROM (@{variables('Query')}) T",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "SQL_Server",
+								"type": "DatasetReference",
+								"parameters": {
+									"kvSecret": "@pipeline().parameters.task.SourceKeyVaultSecret"
+								}
+							}
+						}
+					},
+					{
+						"name": "set-full-path",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "OutputFullPath",
+							"value": {
+								"value": "@replace(replace(replace(replace(replace(replace(\npipeline().parameters.task.RawPath\n,'$yyyy$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'yyyy'))\n,'$MM$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'MM'))\n,'$dd$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'dd'))\n,'$HH$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'HH'))\n,'$mm$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'mm'))\n,'$guid$', guid())",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "set-query",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "if-delta",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "Query",
+							"value": {
+								"value": "@if(variables('IsDelta')\n,replace(replace(\n'SELECT * FROM ($Q$) T $W$'\n,'$Q$', variables('BaseQuery'))\n,'$W$', variables('QueryClause'))\n,variables('BaseQuery'))",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "if-delta",
+						"type": "IfCondition",
+						"dependsOn": [
+							{
+								"activity": "set-base-query",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "set-is-delta",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@variables('IsDelta')",
+								"type": "Expression"
+							},
+							"ifTrueActivities": [
+								{
+									"name": "low-high-watermark",
+									"type": "Lookup",
+									"dependsOn": [
+										{
+											"activity": "set-watermark-column",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "SqlServerSource",
+											"sqlReaderQuery": {
+												"value": "@replace(replace(replace(\n'SELECT COALESCE($PLW$, MIN([$WC$])) [LowWatermark],  MAX([$WC$]) [HighWatermark] FROM ($Q$) T'\n,'$PLW$', if(empty(pipeline().parameters.task.LowWatermark), 'NULL', concat('''', pipeline().parameters.task.LowWatermark, '''')))\n,'$WC$', variables('WatermarkColumn'))\n,'$Q$', variables('BaseQuery'))",
+												"type": "Expression"
+											},
+											"queryTimeout": "02:00:00",
+											"partitionOption": "None"
+										},
+										"dataset": {
+											"referenceName": "SQL_Server",
+											"type": "DatasetReference",
+											"parameters": {
+												"kvSecret": "@pipeline().parameters.task.SourceKeyVaultSecret"
+											}
+										},
+										"firstRowOnly": true
+									}
+								},
+								{
+									"name": "set-watermark-column",
+									"type": "SetVariable",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "WatermarkColumn",
+										"value": {
+											"value": "@pipeline().parameters.task.WatermarkColumn",
+											"type": "Expression"
+										}
+									}
+								},
+								{
+									"name": "set-query-clause",
+									"type": "SetVariable",
+									"dependsOn": [
+										{
+											"activity": "low-high-watermark",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "QueryClause",
+										"value": {
+											"value": "WHERE @{variables('WatermarkColumn')} > @{activity('low-high-watermark').output.firstRow.LowWatermark} AND @{variables('WatermarkColumn')} <= @{activity('low-high-watermark').output.firstRow.HighWatermark}",
+											"type": "Expression"
+										}
+									}
+								},
+								{
+									"name": "task-low-watermark",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "low-high-watermark",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "log-status-update",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"ID": {
+												"value": "@pipeline().parameters.task.ID",
+												"type": "Expression"
+											},
+											"Property": "LowWatermark",
+											"Value": {
+												"value": "@{activity('low-high-watermark').output.firstRow.LowWatermark}",
+												"type": "Expression"
+											}
+										}
+									}
+								},
+								{
+									"name": "task-high-watermark",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "low-high-watermark",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "log-status-update",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"ID": {
+												"value": "@pipeline().parameters.task.ID",
+												"type": "Expression"
+											},
+											"Property": "LowWatermark",
+											"Value": {
+												"value": "@{activity('low-high-watermark').output.firstRow.HighWatermark}",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "set-is-delta",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "IsDelta",
+							"value": {
+								"value": "@not(empty(pipeline().parameters.task.WatermarkColumn))",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "switch-copy-sql",
+						"type": "Switch",
+						"dependsOn": [
+							{
+								"activity": "task-source-row-count",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"on": {
+								"value": "@if(equals(length(split(pipeline().parameters.task.SourceHandler, '/')), 1), pipeline().parameters.task.SourceHandler, split(pipeline().parameters.task.SourceHandler, '/')[1])",
+								"type": "Expression"
+							},
+							"cases": [
+								{
+									"value": "sink-sql",
+									"activities": [
+										{
+											"name": "copy-sink-sql",
+											"type": "Copy",
+											"dependsOn": [],
+											"policy": {
+												"timeout": "7.00:00:00",
+												"retry": 3,
+												"retryIntervalInSeconds": 30,
+												"secureOutput": false,
+												"secureInput": false
+											},
+											"userProperties": [
+												{
+													"name": "Destination",
+													"value": "raw/Cewa Financials/"
+												}
+											],
+											"typeProperties": {
+												"source": {
+													"type": "SqlServerSource",
+													"sqlReaderQuery": {
+														"value": "@variables('Query')",
+														"type": "Expression"
+													},
+													"queryTimeout": "02:00:00",
+													"partitionOption": "None"
+												},
+												"sink": {
+													"type": "SqlServerSink",
+													"preCopyScript": {
+														"value": "BEGIN TRY EXEC('TRUNCATE TABLE [@{pipeline().parameters.task.SourceSchema}].[@{pipeline().parameters.task.SourceTableName}]') END TRY BEGIN CATCH END CATCH",
+														"type": "Expression"
+													},
+													"writeBehavior": "insert",
+													"tableOption": "autoCreate"
+												},
+												"enableStaging": false
+											},
+											"inputs": [
+												{
+													"referenceName": "SQL_Server",
+													"type": "DatasetReference",
+													"parameters": {
+														"kvSecret": {
+															"value": "@pipeline().parameters.task.SourceKeyVaultSecret",
+															"type": "Expression"
+														}
+													}
+												}
+											],
+											"outputs": [
+												{
+													"referenceName": "SQL_Server_Table",
+													"type": "DatasetReference",
+													"parameters": {
+														"kvSecret": {
+															"value": "@pipeline().parameters.task.SourceKeyVaultSecret",
+															"type": "Expression"
+														},
+														"schemaName": {
+															"value": "@pipeline().parameters.task.SourceSchema",
+															"type": "Expression"
+														},
+														"tableName": {
+															"value": "@pipeline().parameters.task.SourceTableName",
+															"type": "Expression"
+														}
+													}
+												}
+											]
+										},
+										{
+											"name": "sink-sql-task-sink-row-count",
+											"type": "ExecutePipeline",
+											"dependsOn": [
+												{
+													"activity": "copy-sink-sql",
+													"dependencyConditions": [
+														"Succeeded"
+													]
+												}
+											],
+											"userProperties": [],
+											"typeProperties": {
+												"pipeline": {
+													"referenceName": "log-status-update",
+													"type": "PipelineReference"
+												},
+												"waitOnCompletion": false,
+												"parameters": {
+													"BatchID": {
+														"value": "@pipeline().parameters.task.BatchID",
+														"type": "Expression"
+													},
+													"SourceID": {
+														"value": "@pipeline().parameters.task.SourceID",
+														"type": "Expression"
+													},
+													"Property": "SinkRowCount",
+													"Value": {
+														"value": "@{activity('copy-sink-sql').output.rowsCopied}",
+														"type": "Expression"
+													}
+												}
+											}
+										},
+										{
+											"name": "sink-sql-log-copy",
+											"type": "ExecutePipeline",
+											"dependsOn": [
+												{
+													"activity": "copy-sink-sql",
+													"dependencyConditions": [
+														"Completed"
+													]
+												}
+											],
+											"userProperties": [],
+											"typeProperties": {
+												"pipeline": {
+													"referenceName": "log-message",
+													"type": "PipelineReference"
+												},
+												"waitOnCompletion": false,
+												"parameters": {
+													"BatchStatusID": {
+														"value": "@pipeline().parameters.task.ID",
+														"type": "Expression"
+													},
+													"ActivityType": "copy-data",
+													"Message": {
+														"value": "@{activity('copy-sink-sql')}",
+														"type": "Expression"
+													}
+												}
+											}
+										}
+									]
+								}
+							],
+							"defaultActivities": [
+								{
+									"name": "copy-sql",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 3,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [
+										{
+											"name": "Destination",
+											"value": "raw/Cewa Financials/"
+										}
+									],
+									"typeProperties": {
+										"source": {
+											"type": "SqlServerSource",
+											"sqlReaderQuery": {
+												"value": "@variables('Query')",
+												"type": "Expression"
+											},
+											"queryTimeout": "02:00:00",
+											"partitionOption": "None"
+										},
+										"sink": {
+											"type": "ParquetSink",
+											"storeSettings": {
+												"type": "AzureBlobFSWriteSettings"
+											},
+											"formatSettings": {
+												"type": "ParquetWriteSettings"
+											}
+										},
+										"enableStaging": false
+									},
+									"inputs": [
+										{
+											"referenceName": "SQL_Server",
+											"type": "DatasetReference",
+											"parameters": {
+												"kvSecret": {
+													"value": "@pipeline().parameters.task.SourceKeyVaultSecret",
+													"type": "Expression"
+												}
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "DLS_Parquet",
+											"type": "DatasetReference",
+											"parameters": {
+												"BlobPath": {
+													"value": "@variables('OutputFullPath')",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								},
+								{
+									"name": "task-raw-path",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "copy-sql",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "log-status-update",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"ID": {
+												"value": "@pipeline().parameters.task.ID",
+												"type": "Expression"
+											},
+											"Property": "RawPath",
+											"Value": {
+												"value": "@variables('OutputFullPath')",
+												"type": "Expression"
+											}
+										}
+									}
+								},
+								{
+									"name": "task-sink-row-count",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "copy-sql",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "log-status-update",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": false,
+										"parameters": {
+											"ID": {
+												"value": "@pipeline().parameters.task.ID",
+												"type": "Expression"
+											},
+											"Property": "SinkRowCount",
+											"Value": {
+												"value": "@{activity('copy-sql').output.rowsCopied}",
+												"type": "Expression"
+											}
+										}
+									}
+								},
+								{
+									"name": "log-copy",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "copy-sql",
+											"dependencyConditions": [
+												"Completed"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "log-message",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": false,
+										"parameters": {
+											"ID": {
+												"value": "@pipeline().parameters.task.ID",
+												"type": "Expression"
+											},
+											"ActivityType": "copy-data",
+											"Message": {
+												"value": "@{activity('copy-sql')}",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "task-source-row-count",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "row-count",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "log-status-update",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"ID": {
+									"value": "@pipeline().parameters.task.ID",
+									"type": "Expression"
+								},
+								"Property": "SourceRowCount",
+								"Value": {
+									"value": "@{activity('row-count').output.firstRow.RowCount}",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "log-count",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "row-count",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "log-message",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"ID": {
+									"value": "@pipeline().parameters.task.ID",
+									"type": "Expression"
+								},
+								"ActivityType": "row-count",
+								"Message": {
+									"value": "@{activity('row-count')}",
+									"type": "Expression"
+								}
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"task": {
+						"type": "object"
+					}
+				},
+				"variables": {
+					"Query": {
+						"type": "String"
+					},
+					"OutputFullPath": {
+						"type": "String"
+					},
+					"WatermarkColumn": {
+						"type": "String"
+					},
+					"BaseQuery": {
+						"type": "String"
+					},
+					"QueryClause": {
+						"type": "String"
+					},
+					"IsDelta": {
+						"type": "Boolean"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/SourceHandler"
+				},
+				"annotations": [],
+				"lastPublishTime": "2021-07-08T10:40:24Z"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/store-table-metadata')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "fetch-source-metadata",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "SqlServerSource",
+								"sqlReaderQuery": {
+									"value": "SELECT TABLE_SCHEMA,TABLE_NAME,COLUMN_NAME,ORDINAL_POSITION,IS_NULLABLE,DATA_TYPE,CHARACTER_MAXIMUM_LENGTH,NUMERIC_PRECISION,NUMERIC_SCALE FROM information_schema.columns (NOLOCK) WHERE TABLE_NAME = '@{pipeline().parameters.TableName}' and TABLE_SCHEMA = '@{pipeline().parameters.SchemaName}'",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "SQL_Server",
+								"type": "DatasetReference",
+								"parameters": {
+									"kvSecret": {
+										"value": "@pipeline().parameters.sourceKeyVaultKey",
+										"type": "Expression"
+									}
+								}
+							},
+							"firstRowOnly": false
+						}
+					},
+					{
+						"name": "store-metadata",
+						"type": "Lookup",
+						"dependsOn": [
+							{
+								"activity": "fetch-source-metadata",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": {
+									"value": "UPDATE [dbo].[ExtractLoadManifest] SET [SourceMetaData]= '@{activity('fetch-source-metadata').output.value}' WHERE  [SourceTableName] = '@{pipeline().parameters.TableName}'  \nAND [SourceSchema] = '@{pipeline().parameters.SchemaName}' SELECT 1 A",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "SQL_ControlDB",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"firstRowOnly": false
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"SchemaName": {
+						"type": "string"
+					},
+					"TableName": {
+						"type": "string"
+					},
+					"sourceKeyVaultKey": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/Setup/Metadata"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Curated-Parallel')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "for-each-curated",
+						"type": "ForEach",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@array(pipeline().parameters.taskList)",
+								"type": "Expression"
+							},
+							"activities": [
+								{
+									"name": "execute-curated",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "Curated",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"task": {
+												"value": "@item()",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"taskList": {
+						"type": "object"
+					}
+				},
+				"variables": {
+					"var1": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/Zone"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Raw')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "switch-source-handler",
+						"type": "Switch",
+						"dependsOn": [
+							{
+								"activity": "log-status-start",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"on": {
+								"value": "@split(pipeline().parameters.task.SourceHandler, '/')[0]",
+								"type": "Expression"
+							},
+							"cases": [
+								{
+									"value": "sql-load",
+									"activities": [
+										{
+											"name": "execute-sql-load",
+											"type": "ExecutePipeline",
+											"dependsOn": [],
+											"userProperties": [],
+											"typeProperties": {
+												"pipeline": {
+													"referenceName": "sql-load",
+													"type": "PipelineReference"
+												},
+												"waitOnCompletion": true,
+												"parameters": {
+													"task": {
+														"value": "@pipeline().parameters.task",
+														"type": "Expression"
+													}
+												}
+											}
+										}
+									]
+								},
+								{
+									"value": "csv-load",
+									"activities": [
+										{
+											"name": "execute-csv-load",
+											"type": "ExecutePipeline",
+											"dependsOn": [],
+											"userProperties": [],
+											"typeProperties": {
+												"pipeline": {
+													"referenceName": "csv-load",
+													"type": "PipelineReference"
+												},
+												"waitOnCompletion": true,
+												"parameters": {
+													"TaskDetails": {
+														"value": "@pipeline().parameters.task",
+														"type": "Expression"
+													}
+												}
+											}
+										}
+									]
+								},
+								{
+									"value": "excel-load",
+									"activities": [
+										{
+											"name": "execute-excel-load",
+											"type": "ExecutePipeline",
+											"dependsOn": [],
+											"userProperties": [],
+											"typeProperties": {
+												"pipeline": {
+													"referenceName": "excel-load",
+													"type": "PipelineReference"
+												},
+												"waitOnCompletion": true,
+												"parameters": {
+													"TaskDetails": {
+														"value": "@pipeline().parameters.task",
+														"type": "Expression"
+													}
+												}
+											}
+										}
+									]
+								},
+								{
+									"value": "http-binary-load",
+									"activities": [
+										{
+											"name": "execute-http-binary-load",
+											"type": "ExecutePipeline",
+											"dependsOn": [],
+											"userProperties": [],
+											"typeProperties": {
+												"pipeline": {
+													"referenceName": "http-binary-load",
+													"type": "PipelineReference"
+												},
+												"waitOnCompletion": true,
+												"parameters": {
+													"TaskDetails": {
+														"value": "@pipeline().parameters.task",
+														"type": "Expression"
+													}
+												}
+											}
+										}
+									]
+								},
+								{
+									"value": "file-binary-load",
+									"activities": [
+										{
+											"name": "execute-file-binary-load",
+											"type": "ExecutePipeline",
+											"dependsOn": [],
+											"userProperties": [],
+											"typeProperties": {
+												"pipeline": {
+													"referenceName": "file-binary-load",
+													"type": "PipelineReference"
+												},
+												"waitOnCompletion": true,
+												"parameters": {
+													"task": {
+														"value": "@pipeline().parameters.task",
+														"type": "Expression"
+													}
+												}
+											}
+										}
+									]
+								},
+								{
+									"value": "canvas-load",
+									"activities": [
+										{
+											"name": "canvas-load",
+											"type": "ExecutePipeline",
+											"dependsOn": [],
+											"userProperties": [],
+											"typeProperties": {
+												"pipeline": {
+													"referenceName": "canvas-load",
+													"type": "PipelineReference"
+												},
+												"waitOnCompletion": true,
+												"parameters": {
+													"task": {
+														"value": "@pipeline().parameters.task",
+														"type": "Expression"
+													}
+												}
+											}
+										}
+									]
+								},
+								{
+									"value": "canvas-graphql-load",
+									"activities": [
+										{
+											"name": "execute-canvas-graphql-load",
+											"type": "ExecutePipeline",
+											"dependsOn": [],
+											"userProperties": [],
+											"typeProperties": {
+												"pipeline": {
+													"referenceName": "canvas-graphql-load",
+													"type": "PipelineReference"
+												},
+												"waitOnCompletion": true,
+												"parameters": {
+													"task": {
+														"value": "@pipeline().parameters.task",
+														"type": "Expression"
+													}
+												}
+											}
+										}
+									]
+								},
+								{
+									"value": "canvas-graphql-load-by-course",
+									"activities": [
+										{
+											"name": "execute-canvas-graphql-load-by-course",
+											"type": "ExecutePipeline",
+											"dependsOn": [],
+											"userProperties": [],
+											"typeProperties": {
+												"pipeline": {
+													"referenceName": "canvas-graphql-load-by-course",
+													"type": "PipelineReference"
+												},
+												"waitOnCompletion": true,
+												"parameters": {
+													"task": {
+														"value": "@pipeline().parameters.task",
+														"type": "Expression"
+													}
+												}
+											}
+										}
+									]
+								},
+								{
+									"value": "s3-binary-load",
+									"activities": [
+										{
+											"name": "execute-s3-binary-load",
+											"type": "ExecutePipeline",
+											"dependsOn": [],
+											"userProperties": [],
+											"typeProperties": {
+												"pipeline": {
+													"referenceName": "s3-binary-load",
+													"type": "PipelineReference"
+												},
+												"waitOnCompletion": true,
+												"parameters": {
+													"task": {
+														"value": "@pipeline().parameters.task",
+														"type": "Expression"
+													}
+												}
+											}
+										}
+									]
+								}
+							]
+						}
+					},
+					{
+						"name": "if-raw-handler",
+						"type": "IfCondition",
+						"dependsOn": [
+							{
+								"activity": "switch-source-handler",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@not(empty(pipeline().parameters.task.RawHandler))",
+								"type": "Expression"
+							},
+							"ifTrueActivities": [
+								{
+									"name": "raw-databricks",
+									"type": "DatabricksNotebook",
+									"dependsOn": [
+										{
+											"activity": "task-status",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"notebookPath": {
+											"value": "/ELT-Framework/Zone/@{pipeline().parameters.task.RawHandler}",
+											"type": "Expression"
+										},
+										"baseParameters": {
+											"rawPath": {
+												"value": "@activity('task-status').output.firstRow.RawPath",
+												"type": "Expression"
+											},
+											"task": {
+												"value": "@{pipeline().parameters.task}",
+												"type": "Expression"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "AzureDatabricks_defaultCluster",
+										"type": "LinkedServiceReference"
+									}
+								},
+								{
+									"name": "task-status",
+									"type": "Lookup",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "AzureSqlSource",
+											"sqlReaderQuery": {
+												"value": "SELECT * FROM [dbo].[ExtractLoadStatus] WHERE [BatchID] = '@{pipeline().parameters.task.BatchID}' AND [SourceID] = '@{pipeline().parameters.task.SourceID}'",
+												"type": "Expression"
+											},
+											"queryTimeout": "02:00:00",
+											"partitionOption": "None"
+										},
+										"dataset": {
+											"referenceName": "SQL_ControlDB",
+											"type": "DatasetReference",
+											"parameters": {}
+										}
+									}
+								},
+								{
+									"name": "log-databricks",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "raw-databricks",
+											"dependencyConditions": [
+												"Completed"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "log-message",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": false,
+										"parameters": {
+											"ID": {
+												"value": "@pipeline().parameters.task.ID",
+												"type": "Expression"
+											},
+											"ActivityType": "raw-databricks",
+											"Message": {
+												"value": "@{activity('raw-databricks')}",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "log-status-start",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "log-status-update",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"ID": {
+									"value": "@pipeline().parameters.task.ID",
+									"type": "Expression"
+								},
+								"Property": "RawStartDTS",
+								"Value": {
+									"value": "@formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'yyyy-MM-dd HH:mm:ss')",
+									"type": "Expression"
+								},
+								"TableName": "ExtractLoadStatus"
+							}
+						}
+					},
+					{
+						"name": "log-status-end",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "if-raw-handler",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "log-status-update",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"ID": {
+									"value": "@pipeline().parameters.task.ID",
+									"type": "Expression"
+								},
+								"Property": "RawEndDTS",
+								"Value": {
+									"value": "@formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'yyyy-MM-dd HH:mm:ss')",
+									"type": "Expression"
+								},
+								"TableName": "ExtractLoadStatus"
+							}
+						}
+					},
+					{
+						"name": "log-status-fail",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "if-raw-handler",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "log-status-update",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"ID": {
+									"value": "@pipeline().parameters.task.ID",
+									"type": "Expression"
+								},
+								"Property": "RawStatus",
+								"Value": "Fail",
+								"TableName": "ExtractLoadStatus"
+							}
+						}
+					},
+					{
+						"name": "log-status-success",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "if-raw-handler",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "log-status-update",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"ID": {
+									"value": "@pipeline().parameters.task.ID",
+									"type": "Expression"
+								},
+								"Property": "RawStatus",
+								"Value": "Success",
+								"TableName": "ExtractLoadStatus"
+							}
+						}
+					},
+					{
+						"name": "log-status-end-fail",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "if-raw-handler",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "log-status-update",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"ID": {
+									"value": "@pipeline().parameters.task.ID",
+									"type": "Expression"
+								},
+								"Property": "RawEndDTS",
+								"Value": {
+									"value": "@formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'yyyy-MM-dd HH:mm:ss')",
+									"type": "Expression"
+								},
+								"TableName": "ExtractLoadStatus"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"task": {
+						"type": "object"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/Zone"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/sql-load')]",
+				"[concat(variables('factoryId'), '/pipelines/s3-binary-load')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/update-source-metadata')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "get-tables",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": {
+									"value": "SELECT [SourceID]\n,[SystemCode]\n,[SourceSchema]\n,[SourceTableName]\n,[SourceKeyVaultSecret]\nFROM [dbo].[ExtractLoadManifest]\nWHERE\nSourceHandler = 'sql-load'\nAND SystemCode = '@{pipeline().parameters.SystemCode}'",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "SQL_ControlDB",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"firstRowOnly": false
+						}
+					},
+					{
+						"name": "for-each-table",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "get-tables",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('get-tables').output.value",
+								"type": "Expression"
+							},
+							"isSequential": false,
+							"activities": [
+								{
+									"name": "execute-update-metadata",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "store-table-metadata",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"SchemaName": {
+												"value": "@item().SourceSchema",
+												"type": "Expression"
+											},
+											"TableName": {
+												"value": "@item().SourceTableName",
+												"type": "Expression"
+											},
+											"sourceKeyVaultKey": {
+												"value": "@item().SourceKeyVaultSecret",
+												"type": "Expression"
+											}
+										}
+									}
+								},
+								{
+									"name": "update-source-query",
+									"type": "Lookup",
+									"dependsOn": [
+										{
+											"activity": "execute-update-metadata",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "AzureSqlSource",
+											"sqlReaderQuery": {
+												"value": "UPDATE R\nSET [SourceQuery] = S.[SelectSQL]\nFROM [dbo].[MetadataGenerated] S\nJOIN [dbo].[ExtractLoadManifest] R ON R.[SourceSchema] = S.[TableSchema] AND R.[SourceTableName] = S.[TableName]\nWHERE [SourceSchema]='@{item().SourceSchema}' AND [SourceTableName]='@{item().SourceTableName}';\nSELECT 1 A",
+												"type": "Expression"
+											},
+											"queryTimeout": "02:00:00",
+											"partitionOption": "None"
+										},
+										"dataset": {
+											"referenceName": "SQL_ControlDB",
+											"type": "DatasetReference",
+											"parameters": {}
+										},
+										"firstRowOnly": true
+									}
+								}
+							]
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"SystemCode": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/Setup/Metadata"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/store-table-metadata')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/System')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "get-tasks",
+						"description": "",
+						"type": "Lookup",
+						"dependsOn": [
+							{
+								"activity": "set-parent-batch",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderStoredProcedureName": "[[dbo].[ExtractLoadInit]",
+								"storedProcedureParameters": {
+									"BatchID": {
+										"value": {
+											"value": "@variables('ParentBatchID')",
+											"type": "Expression"
+										}
+									},
+									"SystemCode": {
+										"value": {
+											"value": "@pipeline().parameters.SystemCode",
+											"type": "Expression"
+										}
+									}
+								},
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "SQL_ControlDB",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"firstRowOnly": false
+						}
+					},
+					{
+						"name": "for-each-raw",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "get-tasks",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('get-tasks').output.value",
+								"type": "Expression"
+							},
+							"isSequential": false,
+							"batchCount": 10,
+							"activities": [
+								{
+									"name": "execute-raw",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "Raw",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"task": {
+												"value": "@item()",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "set-parent-batch",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "ParentBatchID",
+							"value": {
+								"value": "@substring(coalesce(pipeline().parameters.ParentBatchID, pipeline().GroupId), 0,8)",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "for-each-trusted",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "for-each-raw",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('get-tasks').output.value",
+								"type": "Expression"
+							},
+							"isSequential": false,
+							"batchCount": 10,
+							"activities": [
+								{
+									"name": "execute-trusted",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "Trusted",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"task": {
+												"value": "@item()",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "end-system",
+						"type": "Lookup",
+						"dependsOn": [
+							{
+								"activity": "for-each-trusted",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": {
+									"value": "UPDATE U\nSET [EndedDTS] = CONVERT(DATETIME, CONVERT(DATETIMEOFFSET, GETDATE()) AT TIME ZONE 'AUS Eastern Standard Time')\nFROM [dbo].[ExtractLoadStatus] U\nWHERE BatchID = '@{variables('ParentBatchID')}'\nAND SystemCode = '@{pipeline().parameters.SystemCode}'\nSELECT 1 A",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "SQL_ControlDB",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"firstRowOnly": false
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"SystemCode": {
+						"type": "string",
+						"defaultValue": "System"
+					},
+					"ParentBatchID": {
+						"type": "string"
+					}
+				},
+				"variables": {
+					"ParentBatchID": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework"
+				},
+				"annotations": [],
+				"lastPublishTime": "2021-07-08T02:50:54Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/Raw')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Transform')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "get-transform",
+						"description": "",
+						"type": "Lookup",
+						"dependsOn": [
+							{
+								"activity": "set-parent-batch",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderStoredProcedureName": "[[dbo].[TransformInit]",
+								"storedProcedureParameters": {
+									"BatchID": {
+										"value": {
+											"value": "@variables('ParentBatchID')",
+											"type": "Expression"
+										}
+									}
+								},
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "SQL_ControlDB",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"firstRowOnly": false
+						}
+					},
+					{
+						"name": "set-list",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "get-transform",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "list",
+							"value": {
+								"value": "@activity('get-transform').output.value",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "for-each-group",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "if-synapse-resume",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@split(string(variables('list')[0].List), ',')",
+								"type": "Expression"
+							},
+							"isSequential": true,
+							"activities": [
+								{
+									"name": "if-failed",
+									"type": "IfCondition",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"expression": {
+											"value": "@equals(variables('has-failed'), bool(1))",
+											"type": "Expression"
+										},
+										"ifFalseActivities": [
+											{
+												"name": "filter-grouping",
+												"type": "Filter",
+												"dependsOn": [
+													{
+														"activity": "set-current-group",
+														"dependencyConditions": [
+															"Succeeded"
+														]
+													}
+												],
+												"userProperties": [],
+												"typeProperties": {
+													"items": {
+														"value": "@variables('list')",
+														"type": "Expression"
+													},
+													"condition": {
+														"value": "@equals(int(item().ParallelGroup), int(variables('current-group')))",
+														"type": "Expression"
+													}
+												}
+											},
+											{
+												"name": "set-current-group",
+												"type": "SetVariable",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"variableName": "current-group",
+													"value": {
+														"value": "@item()",
+														"type": "Expression"
+													}
+												}
+											},
+											{
+												"name": "execute-curated-parallel",
+												"type": "ExecutePipeline",
+												"dependsOn": [
+													{
+														"activity": "filter-grouping",
+														"dependencyConditions": [
+															"Succeeded"
+														]
+													}
+												],
+												"userProperties": [],
+												"typeProperties": {
+													"pipeline": {
+														"referenceName": "Curated-Parallel",
+														"type": "PipelineReference"
+													},
+													"waitOnCompletion": true,
+													"parameters": {
+														"taskList": {
+															"value": "@activity('filter-grouping').output.value",
+															"type": "Expression"
+														}
+													}
+												}
+											},
+											{
+												"name": "set-has-failed",
+												"type": "SetVariable",
+												"dependsOn": [
+													{
+														"activity": "execute-curated-parallel",
+														"dependencyConditions": [
+															"Failed"
+														]
+													}
+												],
+												"userProperties": [],
+												"typeProperties": {
+													"variableName": "has-failed",
+													"value": true
+												}
+											}
+										]
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "if-fail-pipeline",
+						"type": "IfCondition",
+						"dependsOn": [
+							{
+								"activity": "for-each-group",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@equals(variables('has-failed'), bool(1))",
+								"type": "Expression"
+							},
+							"ifTrueActivities": [
+								{
+									"name": "fail-pipeline",
+									"type": "Fail",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"message": "Inner pipeline failed",
+										"errorCode": "-1"
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "distinct-processors",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "set-list",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('get-transform').output.value",
+								"type": "Expression"
+							},
+							"isSequential": true,
+							"activities": [
+								{
+									"name": "if-synapse-processing",
+									"type": "IfCondition",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"expression": {
+											"value": "@and(contains(item().ProcessorType, 'synapse')\n,not(contains(variables('list'), item().ProcessorType)))",
+											"type": "Expression"
+										},
+										"ifTrueActivities": [
+											{
+												"name": "append-list",
+												"type": "AppendVariable",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"variableName": "distinct-list",
+													"value": {
+														"value": "@item().ProcessorType",
+														"type": "Expression"
+													}
+												}
+											}
+										]
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "if-synapse-resume",
+						"type": "IfCondition",
+						"dependsOn": [
+							{
+								"activity": "distinct-processors",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@greater(length(variables('list')), 0)",
+								"type": "Expression"
+							},
+							"ifTrueActivities": [
+								{
+									"name": "resume-synapse",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "synapse-operation",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"operation": "resume"
+										}
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "set-parent-batch",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "ParentBatchID",
+							"value": {
+								"value": "@substring(coalesce(pipeline().parameters.ParentBatchID, pipeline().GroupId), 0,8)",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"ParentBatchID": {
+						"type": "string"
+					}
+				},
+				"variables": {
+					"list": {
+						"type": "Array"
+					},
+					"current-group": {
+						"type": "String"
+					},
+					"filtered-list": {
+						"type": "Array"
+					},
+					"has-failed": {
+						"type": "Boolean",
+						"defaultValue": false
+					},
+					"distinct-list": {
+						"type": "Array"
+					},
+					"ParentBatchID": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/Curated-Parallel')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Main')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "get-extract-load",
+						"description": " ",
+						"type": "Lookup",
+						"dependsOn": [
+							{
+								"activity": "set-parent-batch",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": {
+									"value": "DECLARE @SystemCodes VARCHAR(50) = '@{pipeline().parameters.SystemCodes}';\nWITH [_SystemCodes] AS (\n\tSELECT DISTINCT TRIM(value) [SystemCode] FROM STRING_SPLIT(IIF(LEN(TRIM(@SystemCodes))=0, NULL, @SystemCodes), ',')\n)\nSELECT \nDISTINCT\nLEFT([SourceID], 2) [Order], M.[SystemCode]\nFROM [dbo].[ExtractLoadManifest] M\nJOIN [_SystemCodes] C ON C.[SystemCode] = M.[SystemCode] \nWHERE [Enabled] = 1 \nUNION \nSELECT \nDISTINCT\nLEFT([SourceID], 2) [Order], M.[SystemCode]\nFROM [dbo].[ExtractLoadManifest] M\nWHERE [Enabled] = 1 AND (SELECT COUNT(*) FROM [_SystemCodes]) = 0\nORDER BY 1",
+									"type": "Expression"
+								},
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "SQL_ControlDB",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"firstRowOnly": false
+						}
+					},
+					{
+						"name": "for-each-source",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "get-extract-load",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('get-extract-load').output.value",
+								"type": "Expression"
+							},
+							"isSequential": false,
+							"batchCount": 4,
+							"activities": [
+								{
+									"name": "execute-system",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "System",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"SystemCode": {
+												"value": "@item().SystemCode",
+												"type": "Expression"
+											},
+											"ParentBatchID": {
+												"value": "@variables('ParentBatchID')",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "set-parent-batch",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "ParentBatchID",
+							"value": {
+								"value": "@substring(pipeline().GroupId, 0,8)",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "if-transform",
+						"type": "IfCondition",
+						"dependsOn": [
+							{
+								"activity": "for-each-source",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@variables('Transform')",
+								"type": "Expression"
+							},
+							"ifTrueActivities": [
+								{
+									"name": "execute-transform",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "Transform",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"ParentBatchID": {
+												"value": "@variables('ParentBatchID')",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"SystemCodes": {
+						"type": "string"
+					}
+				},
+				"variables": {
+					"SystemCode": {
+						"type": "String"
+					},
+					"ParentBatchID": {
+						"type": "String"
+					},
+					"Transform": {
+						"type": "Boolean",
+						"defaultValue": false
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework"
+				},
+				"annotations": [],
+				"lastPublishTime": "2021-07-08T02:50:54Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/System')]",
+				"[concat(variables('factoryId'), '/pipelines/Transform')]"
+			]
+		}
+	]
+}

@@ -1,0 +1,55 @@
+{
+	"name": "Curated-Parallel",
+	"properties": {
+		"activities": [
+			{
+				"name": "for-each-curated",
+				"type": "ForEach",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@array(pipeline().parameters.taskList)",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "execute-curated",
+							"type": "ExecutePipeline",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "Curated",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"task": {
+										"value": "@item()",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"taskList": {
+				"type": "object"
+			}
+		},
+		"variables": {
+			"var1": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "ELT-Framework/Zone"
+		},
+		"annotations": []
+	}
+}

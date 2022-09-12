@@ -1,0 +1,26 @@
+{
+	"name": "AzureDatabricks_defaultCluster",
+	"properties": {
+		"type": "AzureDatabricks",
+		"annotations": [],
+		"typeProperties": {
+			"domain": "https://australiaeast.azuredatabricks.net",
+			"accessToken": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "AzureKeyVault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "Databricks-PAT"
+			},
+			"existingClusterId": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "AzureKeyVault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "Databricks-ClusterId"
+			}
+		}
+	}
+}

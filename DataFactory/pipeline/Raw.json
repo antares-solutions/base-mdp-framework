@@ -1,0 +1,581 @@
+{
+	"name": "Raw",
+	"properties": {
+		"activities": [
+			{
+				"name": "switch-source-handler",
+				"type": "Switch",
+				"dependsOn": [
+					{
+						"activity": "log-status-start",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"on": {
+						"value": "@split(pipeline().parameters.task.SourceHandler, '/')[0]",
+						"type": "Expression"
+					},
+					"cases": [
+						{
+							"value": "sql-load",
+							"activities": [
+								{
+									"name": "execute-sql-load",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "sql-load",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"task": {
+												"value": "@pipeline().parameters.task",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "csv-load",
+							"activities": [
+								{
+									"name": "execute-csv-load",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "csv-load",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"TaskDetails": {
+												"value": "@pipeline().parameters.task",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "excel-load",
+							"activities": [
+								{
+									"name": "execute-excel-load",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "excel-load",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"TaskDetails": {
+												"value": "@pipeline().parameters.task",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "http-binary-load",
+							"activities": [
+								{
+									"name": "execute-http-binary-load",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "http-binary-load",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"TaskDetails": {
+												"value": "@pipeline().parameters.task",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "file-binary-load",
+							"activities": [
+								{
+									"name": "execute-file-binary-load",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "file-binary-load",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"task": {
+												"value": "@pipeline().parameters.task",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "canvas-load",
+							"activities": [
+								{
+									"name": "canvas-load",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "canvas-load",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"task": {
+												"value": "@pipeline().parameters.task",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "canvas-graphql-load",
+							"activities": [
+								{
+									"name": "execute-canvas-graphql-load",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "canvas-graphql-load",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"task": {
+												"value": "@pipeline().parameters.task",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "canvas-graphql-load-by-course",
+							"activities": [
+								{
+									"name": "execute-canvas-graphql-load-by-course",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "canvas-graphql-load-by-course",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"task": {
+												"value": "@pipeline().parameters.task",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "nfs-binary-load",
+							"activities": [
+								{
+									"name": "execute-nfs-binary-load",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "nfs-binary-load",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"task": {
+												"value": "@pipeline().parameters.task",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						}
+					]
+				}
+			},
+			{
+				"name": "if-raw-handler",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "switch-source-handler",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@not(empty(pipeline().parameters.task.RawHandler))",
+						"type": "Expression"
+					},
+					"ifTrueActivities": [
+						{
+							"name": "raw-databricks",
+							"type": "DatabricksNotebook",
+							"dependsOn": [
+								{
+									"activity": "task-status",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"notebookPath": {
+									"value": "/ELT-Framework/Zone/@{pipeline().parameters.task.RawHandler}",
+									"type": "Expression"
+								},
+								"baseParameters": {
+									"rawPath": {
+										"value": "@activity('task-status').output.firstRow.RawPath",
+										"type": "Expression"
+									},
+									"task": {
+										"value": "@{pipeline().parameters.task}",
+										"type": "Expression"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "AzureDatabricks_defaultCluster",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "task-status",
+							"type": "Lookup",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderQuery": {
+										"value": "SELECT * FROM [dbo].[ExtractLoadStatus] WHERE [BatchID] = '@{pipeline().parameters.task.BatchID}' AND [SourceID] = '@{pipeline().parameters.task.SourceID}'",
+										"type": "Expression"
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"dataset": {
+									"referenceName": "SQL_ControlDB",
+									"type": "DatasetReference"
+								}
+							}
+						},
+						{
+							"name": "log-databricks",
+							"type": "ExecutePipeline",
+							"dependsOn": [
+								{
+									"activity": "raw-databricks",
+									"dependencyConditions": [
+										"Completed"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "log-message",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": false,
+								"parameters": {
+									"ID": {
+										"value": "@pipeline().parameters.task.ID",
+										"type": "Expression"
+									},
+									"ActivityType": "raw-databricks",
+									"Message": {
+										"value": "@{activity('raw-databricks')}",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "log-status-start",
+				"type": "ExecutePipeline",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "log-status-update",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": false,
+					"parameters": {
+						"ID": {
+							"value": "@pipeline().parameters.task.ID",
+							"type": "Expression"
+						},
+						"Property": "RawStartDTS",
+						"Value": {
+							"value": "@formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'yyyy-MM-dd HH:mm:ss')",
+							"type": "Expression"
+						},
+						"TableName": "ExtractLoadStatus"
+					}
+				}
+			},
+			{
+				"name": "log-status-end",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "if-raw-handler",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "log-status-update",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": false,
+					"parameters": {
+						"ID": {
+							"value": "@pipeline().parameters.task.ID",
+							"type": "Expression"
+						},
+						"Property": "RawEndDTS",
+						"Value": {
+							"value": "@formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'yyyy-MM-dd HH:mm:ss')",
+							"type": "Expression"
+						},
+						"TableName": "ExtractLoadStatus"
+					}
+				}
+			},
+			{
+				"name": "log-status-fail",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "if-raw-handler",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "log-status-update",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": false,
+					"parameters": {
+						"ID": {
+							"value": "@pipeline().parameters.task.ID",
+							"type": "Expression"
+						},
+						"Property": "RawStatus",
+						"Value": "Fail",
+						"TableName": "ExtractLoadStatus"
+					}
+				}
+			},
+			{
+				"name": "log-status-success",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "if-raw-handler",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "log-status-update",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": false,
+					"parameters": {
+						"ID": {
+							"value": "@pipeline().parameters.task.ID",
+							"type": "Expression"
+						},
+						"Property": "RawStatus",
+						"Value": "Success",
+						"TableName": "ExtractLoadStatus"
+					}
+				}
+			},
+			{
+				"name": "log-status-end-fail",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "if-raw-handler",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "log-status-update",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": false,
+					"parameters": {
+						"ID": {
+							"value": "@pipeline().parameters.task.ID",
+							"type": "Expression"
+						},
+						"Property": "RawEndDTS",
+						"Value": {
+							"value": "@formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'yyyy-MM-dd HH:mm:ss')",
+							"type": "Expression"
+						},
+						"TableName": "ExtractLoadStatus"
+					}
+				}
+			},
+			{
+				"name": "log-status-fail-source",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "switch-source-handler",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "log-status-update",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": false,
+					"parameters": {
+						"ID": {
+							"value": "@pipeline().parameters.task.ID",
+							"type": "Expression"
+						},
+						"Property": "RawStatus",
+						"Value": "Fail",
+						"TableName": "ExtractLoadStatus"
+					}
+				}
+			},
+			{
+				"name": "log-status-end-fail-source",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "switch-source-handler",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "log-status-update",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": false,
+					"parameters": {
+						"ID": {
+							"value": "@pipeline().parameters.task.ID",
+							"type": "Expression"
+						},
+						"Property": "RawEndDTS",
+						"Value": {
+							"value": "@formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'yyyy-MM-dd HH:mm:ss')",
+							"type": "Expression"
+						},
+						"TableName": "ExtractLoadStatus"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"task": {
+				"type": "object"
+			}
+		},
+		"folder": {
+			"name": "ELT-Framework/Zone"
+		},
+		"annotations": []
+	}
+}

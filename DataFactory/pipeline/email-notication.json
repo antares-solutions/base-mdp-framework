@@ -1,0 +1,91 @@
+{
+	"name": "email-notication",
+	"properties": {
+		"activities": [
+			{
+				"name": "Send email on failure",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": "https://prod-23.australiaeast.logic.azure.com:443/workflows/0fadb5ddcd7e4d8d94d3ab68a0f3a1a4/triggers/manual/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=ZtgYhoSXZEO0YSyP_Ta2ZfVj4fqDtDGsyUOrYP1z-Wc",
+					"method": "POST",
+					"headers": {
+						"Content-Type": "application/json"
+					},
+					"body": {
+						"value": "{\n   \"Title\": \"PIPELINE FAILURE\",\n   \"Color\": \"Red\",\n   \"DataFactoryName\": \"@{pipeline().parameters.vDataFactoryName}\",\n   \"PipelineName\": \"@{pipeline().parameters.vPipelineName}\",\n   \"ActivityName\": \"@{pipeline().parameters.vActivityName}\",\n   \"PipelineRunID\": \"@{pipeline().parameters.vPipelineRunID}\",\n   \"PipelineActivity\": \"@{pipeline().parameters.vPipelineRunID}\",\n   \"PipelineTriggerID\": \"@{pipeline().parameters.vPipelineTriggerID}\",\n   \"PipelineTriggerName\": \"@{pipeline().parameters.vPipelineTriggerName}\",\n   \"PipelineTriggerType\": \"@{pipeline().parameters.vPipelineTriggerType}\",\n   \"PipelineTriggerTime\": \"@{pipeline().parameters.vPipelineTriggerTime}\",\n   \"ExecutionStartTime\": \"@{pipeline().parameters.vExecutionStartTime}\",\n   \"ExecutionEndTime\": \"@{pipeline().parameters.vExecutionEndTime}\",\n   \"ActivityRunID\": \"@{pipeline().parameters.vActivityRunID}\",\n   \"ErrorCode\": \"@{pipeline().parameters.vErrorCode}\",\n   \"FailureType\": \"@{pipeline().parameters.vFailureType}\",\n   \"Subject\":\"ADF Pipeline @{pipeline().parameters.vPipelineName} had failed\",\n   \"ErrorMessage\": \"@{pipeline().parameters.vErrorMessage}\",\n   \"Contact\": \"kishoreb@antaressolutions.com.au\",\n   \"EmailTo\": \"@{variables('vToEmail')}\",\n   \"EmailCc\": \"@{variables('vCCEmail')}\",\n   \"ErrorDate\": \"@{pipeline().parameters.vErrorDate}\"\n}\n\n\n\n",
+						"type": "Expression"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"vPipelineName": {
+				"type": "string"
+			},
+			"vPipelineTriggerName": {
+				"type": "string"
+			},
+			"vPipelineTriggerType": {
+				"type": "string"
+			},
+			"vPipelineTriggerID": {
+				"type": "string"
+			},
+			"vPipelineTriggerTime": {
+				"type": "string"
+			},
+			"vErrorMessage": {
+				"type": "string"
+			},
+			"vDataFactoryName": {
+				"type": "string"
+			},
+			"vPipelineRunID": {
+				"type": "string"
+			},
+			"vErrorCode": {
+				"type": "string"
+			},
+			"vFailureType": {
+				"type": "string"
+			},
+			"vActivityRunID": {
+				"type": "string"
+			},
+			"vExecutionStartTime": {
+				"type": "string"
+			},
+			"vExecutionEndTime": {
+				"type": "string"
+			},
+			"vErrorDate": {
+				"type": "string"
+			},
+			"vActivityName": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"vToEmail": {
+				"type": "String",
+				"defaultValue": "kishoreb@antaressolutions.com.au, kelvinh@antaressolutions.com.au"
+			},
+			"vCCEmail": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "ELT-Framework/EmailTrigger"
+		},
+		"annotations": []
+	}
+}

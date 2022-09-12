@@ -1,0 +1,37 @@
+{
+	"name": "S3_Binary_Folder",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "AmazonS3",
+			"type": "LinkedServiceReference",
+			"parameters": {
+				"systemName": {
+					"value": "@dataset().s3KVSecret",
+					"type": "Expression"
+				}
+			}
+		},
+		"parameters": {
+			"folderPath": {
+				"type": "string"
+			},
+			"s3KVSecret": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "ELT-Framework/S3"
+		},
+		"annotations": [],
+		"type": "Binary",
+		"typeProperties": {
+			"location": {
+				"type": "AmazonS3Location",
+				"bucketName": {
+					"value": "@dataset().folderPath",
+					"type": "Expression"
+				}
+			}
+		}
+	}
+}

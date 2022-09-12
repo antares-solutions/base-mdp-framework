@@ -1,0 +1,127 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+
+  "parameters": {
+    "ServicePrincipal_ObjectID": {
+      "type": "string",
+      "metadata": {
+        "description": "SP Object ID"
+      }
+    },
+    "AzureSqlServerName": {
+      "type": "string",
+      "metadata": {
+        "description": "SQL Server Name"
+      }
+    },
+    "dbUsername": {
+      "type": "string",
+      "metadata": {
+        "description": "SQL Server Username"
+      }
+    },
+    "dbPassword": {
+      "type": "string",
+      "metadata": {
+        "description": "SQL Server Password"
+      }
+    },
+    "dataLakeName": {
+      "type": "string",
+      "metadata": {
+        "description": "Data Lake Name"
+      }
+    },
+    "dataFactoryName": {
+      "type": "string",
+      "metadata": {
+        "description": "Data Factory Name"
+      }
+    },
+    "SHIRName": {
+      "type": "string",
+      "metadata": {
+        "description": "Data Factory SHIR Name"
+      }
+    },
+    "keyVaultName": {
+      "type": "string",
+      "metadata": {
+        "description": "Key Vault Name"
+      }
+    },
+    "databricksWorkspaceName": {
+      "type": "string",
+      "metadata": {
+        "description": "Databricks Name"
+      }
+    },
+    "synapseWorkspaceName": {
+      "type": "string",
+      "metadata": {
+        "description": "Synapse Name"
+      }
+    }
+  },
+
+  "variables": {
+    "location": "[resourceGroup().location]",
+    "tenantId": "[subscription().tenantId]",
+    "firewallRules": [
+      {
+        "name": "ADF_IP_Range1",
+        "startIP": "20.37.193.1",
+        "endIP": "20.37.193.1"
+      },
+      {
+        "name": "ADF_IP_Range2",
+        "startIP": "20.37.193.2",
+        "endIP": "20.37.193.2"
+      },
+      {
+        "name": "ADF_IP_Range3",
+        "startIP": "20.37.193.3",
+        "endIP": "20.37.193.3"
+      }
+    ]
+  },
+
+  "resources": [
+    {
+      "name": "[concat(parameters('AzureSqlServerName'), '/', variables('firewallRules')[copyIndex()].name)]",
+      "type": "Microsoft.Sql/servers/firewallrules",
+      "apiVersion": "2014-04-01-preview",
+      "location": "[variables('location')]",
+      "dependsOn": [
+      ],
+      "properties": {
+        "startIpAddress": "[variables('firewallRules')[copyIndex()].startIP]",
+        "endIpAddress": "[variables('firewallRules')[copyIndex()].endIP]"
+      },
+      "copy": {
+        "name": "firewallRulesList",
+        "count": "[length(variables('firewallRules'))]"
+      }
+    },
+    {
+      "name": "[concat(parameters('synapseWorkspaceName'), '/', variables('firewallRules')[copyIndex()].name)]",
+      "type": "Microsoft.Synapse/workspaces/firewallrules",
+      "apiVersion": "2021-03-01",
+      "location": "[variables('location')]",
+      "dependsOn": [
+      ],
+      "properties": {
+        "startIpAddress": "[variables('firewallRules')[copyIndex()].startIP]",
+        "endIpAddress": "[variables('firewallRules')[copyIndex()].endIP]"
+      },
+      "copy": {
+        "name": "firewallRulesList",
+        "count": "[length(variables('firewallRules'))]"
+      }
+    }
+  ],
+
+  "outputs": {
+  }
+}

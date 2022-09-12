@@ -1,0 +1,190 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"type": "string",
+			"metadata": "Data Factory name",
+			"defaultValue": "adf-base-mdp-dev-01"
+		},
+		"AmazonS3_properties_typeProperties_accessKeyId": {
+			"type": "object",
+			"defaultValue": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "AzureKeyVault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": {
+					"value": "@concat(linkedService().systemName, '-AccessKeyID-KVSecret')",
+					"type": "Expression"
+				}
+			}
+		},
+		"AzureDataLakeStorage_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "https://dlsbasemdpdev01.dfs.core.windows.net"
+		},
+		"AzureKeyVault_properties_typeProperties_baseUrl": {
+			"type": "string",
+			"defaultValue": "https://akv-base-mdp-dev-01.vault.azure.net/"
+		},
+		"AzureSqlDatabase_Ctrldb_properties_typeProperties_connectionString_secretName": {
+			"type": "string",
+			"defaultValue": "ADF-ControlDB"
+		},
+		"HttpLinkAnonymous_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "@{linkedService().url}"
+		},
+		"REST_Anonymous_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "@{linkedService().url}"
+		},
+		"SFTP_Basic_properties_typeProperties_host": {
+			"type": "object",
+			"defaultValue": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "AzureKeyVault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "Preceda-SFTP-Host"
+			}
+		},
+		"SFTP_Basic_properties_typeProperties_userName": {
+			"type": "object",
+			"defaultValue": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "AzureKeyVault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "Preceda-SFTP-Username"
+			}
+		},
+		"SQLServer_properties_typeProperties_connectionString_secretName": {
+			"type": "string",
+			"defaultValue": "@linkedService().kvSecret"
+		},
+		"dataFactory_properties_globalParameters_keyVaultName_value": {
+			"type": "string",
+			"defaultValue": "akv-base-mdp-dev-01"
+		},
+		"dataFactory_properties_globalParameters_storageName_value": {
+			"type": "string",
+			"defaultValue": "dlsbasemdpdev01"
+		},
+		"dataFactory_location": {
+			"type": "string",
+			"defaultValue": "australiaeast"
+		},
+		"containerUri": {
+			"type": "string",
+			"metadata": "URI to storage account containing linked ARM templates"
+		},
+		"containerSasToken": {
+			"type": "string",
+			"metadata": "Sas token to storage account containing linked ARM templates"
+		}
+	},
+	"variables": {
+		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+	},
+	"resources": [
+		{
+			"name": "adf-base-mdp-dev-01_ArmTemplate_0",
+			"type": "Microsoft.Resources/deployments",
+			"apiVersion": "2018-02-01",
+			"properties": {
+				"mode": "incremental",
+				"templateLink": {
+					"uri": "[concat(parameters('containerUri'), '/ArmTemplate_0.json', parameters('containerSasToken'))]",
+					"contentVersion": "1.0.0.0"
+				},
+				"parameters": {
+					"factoryName": {
+						"value": "[parameters('factoryName')]"
+					},
+					"dataFactory_properties_globalParameters_keyVaultName_value": {
+						"value": "[parameters('dataFactory_properties_globalParameters_keyVaultName_value')]"
+					},
+					"dataFactory_properties_globalParameters_storageName_value": {
+						"value": "[parameters('dataFactory_properties_globalParameters_storageName_value')]"
+					},
+					"dataFactory_location": {
+						"value": "[parameters('dataFactory_location')]"
+					},
+					"AzureKeyVault_properties_typeProperties_baseUrl": {
+						"value": "[parameters('AzureKeyVault_properties_typeProperties_baseUrl')]"
+					},
+					"HttpLinkAnonymous_properties_typeProperties_url": {
+						"value": "[parameters('HttpLinkAnonymous_properties_typeProperties_url')]"
+					},
+					"REST_Anonymous_properties_typeProperties_url": {
+						"value": "[parameters('REST_Anonymous_properties_typeProperties_url')]"
+					},
+					"AmazonS3_properties_typeProperties_accessKeyId": {
+						"value": "[parameters('AmazonS3_properties_typeProperties_accessKeyId')]"
+					},
+					"AzureDataLakeStorage_properties_typeProperties_url": {
+						"value": "[parameters('AzureDataLakeStorage_properties_typeProperties_url')]"
+					},
+					"AzureSqlDatabase_Ctrldb_properties_typeProperties_connectionString_secretName": {
+						"value": "[parameters('AzureSqlDatabase_Ctrldb_properties_typeProperties_connectionString_secretName')]"
+					},
+					"SFTP_Basic_properties_typeProperties_host": {
+						"value": "[parameters('SFTP_Basic_properties_typeProperties_host')]"
+					},
+					"SFTP_Basic_properties_typeProperties_userName": {
+						"value": "[parameters('SFTP_Basic_properties_typeProperties_userName')]"
+					},
+					"SQLServer_properties_typeProperties_connectionString_secretName": {
+						"value": "[parameters('SQLServer_properties_typeProperties_connectionString_secretName')]"
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "adf-base-mdp-dev-01_ArmTemplate_1",
+			"type": "Microsoft.Resources/deployments",
+			"apiVersion": "2018-02-01",
+			"properties": {
+				"mode": "incremental",
+				"templateLink": {
+					"uri": "[concat(parameters('containerUri'), '/ArmTemplate_1.json', parameters('containerSasToken'))]",
+					"contentVersion": "1.0.0.0"
+				},
+				"parameters": {
+					"factoryName": {
+						"value": "[parameters('factoryName')]"
+					}
+				}
+			},
+			"dependsOn": [
+				"[resourceId('Microsoft.Resources/deployments', 'adf-base-mdp-dev-01_ArmTemplate_0')]"
+			]
+		},
+		{
+			"name": "adf-base-mdp-dev-01_ArmTemplate_2",
+			"type": "Microsoft.Resources/deployments",
+			"apiVersion": "2018-02-01",
+			"properties": {
+				"mode": "incremental",
+				"templateLink": {
+					"uri": "[concat(parameters('containerUri'), '/ArmTemplate_2.json', parameters('containerSasToken'))]",
+					"contentVersion": "1.0.0.0"
+				},
+				"parameters": {
+					"factoryName": {
+						"value": "[parameters('factoryName')]"
+					}
+				}
+			},
+			"dependsOn": [
+				"[resourceId('Microsoft.Resources/deployments', 'adf-base-mdp-dev-01_ArmTemplate_1')]"
+			]
+		}
+	]
+}

@@ -1,0 +1,280 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+
+  "parameters": {
+    "ServicePrincipal-ObjectID": {
+      "type": "string",
+      "metadata": {
+        "description": "SP Object ID"
+      }
+    },
+    "AzureSqlServerName": {
+      "type": "string",
+      "metadata": {
+        "description": "SQL Server Name"
+      }
+    },
+    "dbUsername": {
+      "type": "string",
+      "metadata": {
+        "description": "SQL Server Username"
+      }
+    },
+    "dbPassword": {
+      "type": "string",
+      "metadata": {
+        "description": "SQL Server Password"
+      }
+    },
+    "dataLakeName": {
+      "type": "string",
+      "metadata": {
+        "description": "Data Lake Name"
+      }
+    },
+    "dataFactoryName": {
+      "type": "string",
+      "metadata": {
+        "description": "Data Factory Name"
+      }
+    },
+    "SHIRName": {
+      "type": "string",
+      "metadata": {
+        "description": "Data Factory SHIR Name"
+      }
+    },
+    "keyVaultName": {
+      "type": "string",
+      "metadata": {
+        "description": "Key Vault Name"
+      }
+    },
+    "databricksWorkspaceName": {
+      "type": "string",
+      "metadata": {
+        "description": "Databricks Name"
+      }
+    },
+    "synapseWorkspaceName": {
+      "type": "string",
+      "metadata": {
+        "description": "Synapse Name"
+      }
+    }
+  },
+
+  "variables": {
+    "location": "[resourceGroup().location]",
+    "tenantId": "[subscription().tenantId]",
+    "use-synapse": "[not(empty(parameters('synapseWorkspaceName')))]",
+    "synapse-name": "[if(not(empty(parameters('synapseWorkspaceName'))), parameters('synapseWorkspaceName'), 'blanksynapse')]"
+  },
+
+  "resources": [
+    {
+      "name": "[parameters('AzureSqlServerName')]",
+      "type": "Microsoft.Sql/servers",
+      "apiVersion": "2015-05-01-preview",
+      "location": "[variables('location')]",
+      "tags": {
+        "displayName": "SQL Server"
+      },
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {
+        "administratorLogin": "[parameters('dbUsername')]",
+        "administratorLoginPassword": "[parameters('dbPassword')]"
+      },
+      "resources": [
+        {
+          "name": "AllowAllWindowsAzureIps",
+          "type": "firewallrules",
+          "apiVersion": "2014-04-01-preview",
+          "dependsOn": [
+            "[resourceId('Microsoft.Sql/servers', parameters('AzureSqlServerName'))]"
+          ],
+          "properties": {
+            "startIpAddress": "0.0.0.0",
+            "endIpAddress": "0.0.0.0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "[parameters('dataFactoryName')]",
+      "apiVersion": "2018-06-01",
+      "type": "Microsoft.DataFactory/factories",
+      "tags": {
+        "displayName": "Data Factory"
+      },
+      "location": "[variables('location')]",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {
+      },
+      "resources": [
+      ]
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "name": "[parameters('dataLakeName')]",
+      "apiVersion": "2018-07-01",
+      "location": "[variables('location')]",
+      "sku": {
+        "name": "Standard_LRS",
+        "tier": "Standard"
+      },
+      "kind": "StorageV2",
+      "tags": {
+        "displayName": "Data Lake Storage Account"
+      },
+      "dependsOn": [
+        "[parameters('dataFactoryName')]",
+        "[concat('Microsoft.DataFactory/factories/', parameters('dataFactoryName'))]"
+      ],
+      "properties": {
+        "isHnsEnabled": true,
+        "accessTier": "Hot"
+      },
+      "resources": [
+        {
+          "name": "default/synapse",
+          "type": "blobServices/containers",
+          "apiVersion": "2018-07-01",
+          "condition": "[variables('use-synapse')]",
+          "dependsOn": [
+            "[parameters('dataLakeName')]"
+          ],
+          "tags": {
+            "displayName": "synapse"
+          }
+        }
+      ]
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults",
+      "name": "[parameters('keyVaultName')]",
+      "location": "[variables('location')]",
+      "apiVersion": "2018-02-14",
+      "tags": {
+        "displayName": "Key Vault"
+      },
+      "properties": {
+        "enabledForDeployment": "true",
+        "enabledForTemplateDeployment": "true",
+        "tenantId": "[variables('tenantId')]",
+        "accessPolicies": [
+          {
+            "objectId": "[parameters('ServicePrincipal-ObjectID')]",
+            "tenantId": "[variables('tenantId')]",
+            "permissions": {
+              "secrets": [ "get" ]
+            }
+          },
+          {
+            "tenantId": "[variables('tenantId')]",
+            "objectId": "[reference(concat('Microsoft.DataFactory/factories/', parameters('dataFactoryName')), '2018-06-01', 'Full').identity.principalId]",
+            "permissions": {
+              "secrets": [ "get" ]
+            }
+          }
+        ],
+        "sku": {
+          "name": "Standard",
+          "family": "A"
+        },
+        "networkAcls": {
+          "value": {
+            "defaultAction": "Allow",
+            "bypass": "AzureServices"
+          }
+        },
+        "dependsOn": [
+          "[concat('Microsoft.DataFactory/factories/', parameters('dataFactoryName'))]"
+        ]
+      },
+      "resources": [
+      ]
+    },
+    {
+      "apiVersion": "2018-04-01",
+      "type": "Microsoft.Databricks/workspaces",
+      "location": "[variables('location')]",
+      "name": "[parameters('databricksWorkspaceName')]",
+      "tags": {
+        "displayName": "Databricks"
+      },
+      "sku": {
+        "name": "standard"
+      },
+      "properties": {
+        "ManagedResourceGroupId": "[concat(subscription().id, '/resourceGroups/', concat('databricks-', parameters('databricksWorkspaceName'), '-', uniqueString(parameters('databricksWorkspaceName'), resourceGroup().id)))]",
+        "parameters": {
+        }
+      }
+    },
+    {
+      "apiVersion": "2021-03-01",
+      "type": "Microsoft.Synapse/workspaces",
+      "condition": "[variables('use-synapse')]",
+      "location": "[variables('location')]",
+      "name": "[variables('synapse-name')]",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "tags": {
+        "displayName": "Synapse Analytics"
+      },
+      "dependsOn": [
+        "[parameters('dataLakeName')]",
+        "[concat('Microsoft.Storage/storageAccounts/', parameters('dataLakeName'))]"
+      ],
+      "properties": {
+        "defaultDataLakeStorage": {
+          "accountUrl": "[concat('https://', parameters('dataLakeName'), '.dfs.core.windows.net')]",
+          "filesystem": "synapse"
+        },
+        "managedVirtualNetwork": "default",
+        "sqlAdministratorLogin": "[parameters('dbUsername')]",
+        "sqlAdministratorLoginPassword": "[parameters('dbPassword')]"
+      },
+      "resources": [
+        {
+          "type": "firewallrules",
+          "apiVersion": "2021-03-01",
+          "condition": "[variables('use-synapse')]",
+          "name": "allowAll",
+          "location": "[variables('location')]",
+          "dependsOn": [
+            "[concat('Microsoft.Synapse/workspaces/', variables('synapse-name'))]"
+          ],
+          "properties": {
+            "startIpAddress": "0.0.0.0",
+            "endIpAddress": "255.255.255.255"
+          }
+        },
+        {
+          "type": "managedIdentitySqlControlSettings",
+          "apiVersion": "2021-03-01",
+          "condition": "[variables('use-synapse')]",
+          "name": "default",
+          "location": "[variables('location')]",
+          "dependsOn": [
+            "[concat('Microsoft.Synapse/workspaces/', variables('synapse-name'))]"
+          ],
+          "properties": {
+            "grantSqlControlToManagedIdentity": {
+              "desiredState": "Enabled"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "outputs": {
+  }
+}

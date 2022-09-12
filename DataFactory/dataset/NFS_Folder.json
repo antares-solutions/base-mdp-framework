@@ -1,0 +1,37 @@
+{
+	"name": "NFS_Folder",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "NetworkFileShare",
+			"type": "LinkedServiceReference",
+			"parameters": {
+				"systemName": {
+					"value": "@dataset().systemName",
+					"type": "Expression"
+				}
+			}
+		},
+		"parameters": {
+			"systemName": {
+				"type": "string"
+			},
+			"folderPath": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "ELT-Framework/NFS"
+		},
+		"annotations": [],
+		"type": "Binary",
+		"typeProperties": {
+			"location": {
+				"type": "FileServerLocation",
+				"folderPath": {
+					"value": "@dataset().folderPath",
+					"type": "Expression"
+				}
+			}
+		}
+	}
+}

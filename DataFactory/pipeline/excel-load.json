@@ -1,0 +1,324 @@
+{
+	"name": "excel-load",
+	"properties": {
+		"activities": [
+			{
+				"name": "set-filename",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "OutputFileName",
+					"value": {
+						"value": "@guid()",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "set-path",
+				"description": "",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "OutputPath",
+					"value": {
+						"value": "@pipeline().parameters.TaskDetails.RawPath",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "set-full-path",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "set-path",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "set-filename",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "OutputFullPath",
+					"value": {
+						"value": "@replace(replace(replace(replace(replace(\nconcat(variables('OutputPath'), if(endswith(variables('OutputPath'), '/'), '', '/'), variables('OutputFileName'), '.parquet')\n,'$yyyy$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'yyyy'))\n,'$MM$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'MM'))\n,'$dd$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'dd'))\n,'$HH$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'HH'))\n,'$mm$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'mm'))\n",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Input-Folderpath",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "InputFolderPath",
+					"value": {
+						"value": "@pipeline().parameters.TaskDetails.SourceFolderPath",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Input-Filepath",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "InputFilePath",
+					"value": {
+						"value": "@pipeline().parameters.TaskDetails.SourceFileName",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Set-full-inputpath",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Input-Folderpath",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Input-Filepath",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "InputFullPath",
+					"value": {
+						"value": "@concat(variables('InputFolderPath'),'/',variables('InputFilePath'))",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "copy-Excel",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "set-full-path",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Set-full-inputpath",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "get-index",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [
+					{
+						"name": "Destination",
+						"value": "raw/Cewa Financials/"
+					}
+				],
+				"typeProperties": {
+					"source": {
+						"type": "ExcelSource",
+						"storeSettings": {
+							"type": "AzureBlobFSReadSettings",
+							"recursive": true,
+							"enablePartitionDiscovery": false
+						}
+					},
+					"sink": {
+						"type": "ParquetSink",
+						"storeSettings": {
+							"type": "AzureBlobFSWriteSettings"
+						},
+						"formatSettings": {
+							"type": "ParquetWriteSettings"
+						}
+					},
+					"enableStaging": false
+				},
+				"inputs": [
+					{
+						"referenceName": "DLS_Excel_index",
+						"type": "DatasetReference",
+						"parameters": {
+							"filePath": {
+								"value": "@variables('InputFullPath')",
+								"type": "Expression"
+							},
+							"sheetIndex": {
+								"value": "@variables('Index')",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DLS_Parquet",
+						"type": "DatasetReference",
+						"parameters": {
+							"BlobPath": {
+								"value": "@variables('OutputFullPath')",
+								"type": "Expression"
+							}
+						}
+					}
+				]
+			},
+			{
+				"name": "log-copy",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "copy-Excel",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[dbo].[LogMessage]",
+					"storedProcedureParameters": {
+						"BatchStatusID": {
+							"value": {
+								"value": "@pipeline().parameters.TaskDetails.ID",
+								"type": "Expression"
+							},
+							"type": "Int32"
+						},
+						"PipelineRunID": {
+							"value": null,
+							"type": "String"
+						},
+						"ActivityType": {
+							"value": "copy-data",
+							"type": "String"
+						},
+						"Message": {
+							"value": {
+								"value": "@{activity('copy-Excel')}",
+								"type": "Expression"
+							},
+							"type": "String"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "AzureSqlDatabase_Ctrldb",
+					"type": "LinkedServiceReference"
+				}
+			},
+			{
+				"name": "get-index",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "Index",
+					"value": {
+						"value": "@string(json(pipeline().parameters.TaskDetails.ExtendedProperties).SheetIndex)",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "task-raw-path",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "copy-Excel",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "log-status-update",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"ID": {
+							"value": "@pipeline().parameters.TaskDetails.ID",
+							"type": "Expression"
+						},
+						"Property": "RawPath",
+						"Value": {
+							"value": "@variables('OutputFullPath')",
+							"type": "Expression"
+						}
+					}
+				}
+			}
+		],
+		"parameters": {
+			"TaskDetails": {
+				"type": "object"
+			}
+		},
+		"variables": {
+			"OutputFileName": {
+				"type": "String"
+			},
+			"OutputPath": {
+				"type": "String"
+			},
+			"OutputFullPath": {
+				"type": "String"
+			},
+			"InputFolderPath": {
+				"type": "String"
+			},
+			"InputFilePath": {
+				"type": "String"
+			},
+			"InputFullPath": {
+				"type": "String"
+			},
+			"Index": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "ELT-Framework/SourceHandler/DLS"
+		},
+		"annotations": []
+	}
+}

@@ -1,0 +1,96 @@
+{
+	"name": "create-table-from-metadata",
+	"properties": {
+		"activities": [
+			{
+				"name": "generate-create-table",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "SELECT \nCONCAT([CreateSchema], [CreateTableSQL]) [CreateTableSQL]\nFROM [dbo].[MetadataGenerated] S\nJOIN [dbo].[ExtractLoadManifest] R ON R.SourceSchema = S.TableSchema AND R.SourceTableName = S.TableName\nWHERE [SourceSchema]='@{pipeline().parameters.SchemaName}' AND [SourceTableName]='@{pipeline().parameters.TableName}'",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "SQL_ControlDB",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "create-table-on-target",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "generate-create-table",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "SqlServerSource",
+						"sqlReaderQuery": {
+							"value": "@{activity('generate-create-table').output.value[0].CreateSchema} @{activity('generate-create-table').output.value[0].CreateTableSQL} SELECT 1 A\n\n\n",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "SQL_Server",
+						"type": "DatasetReference",
+						"parameters": {
+							"kvSecret": {
+								"value": "@pipeline().parameters.targetKeyVaultKey",
+								"type": "Expression"
+							}
+						}
+					},
+					"firstRowOnly": false
+				}
+			}
+		],
+		"parameters": {
+			"SchemaName": {
+				"type": "string"
+			},
+			"TableName": {
+				"type": "string"
+			},
+			"sourceKeyVaultKey": {
+				"type": "string"
+			},
+			"targetKeyVaultKey": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "ELT-Framework/Setup/Metadata"
+		},
+		"annotations": []
+	}
+}

@@ -1,0 +1,165 @@
+{
+	"name": "Main",
+	"properties": {
+		"activities": [
+			{
+				"name": "get-extract-load",
+				"description": " ",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "set-parent-batch",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "DECLARE @SystemCodes VARCHAR(50) = '@{pipeline().parameters.SystemCodes}';\nWITH [_SystemCodes] AS (\n\tSELECT DISTINCT TRIM(value) [SystemCode] FROM STRING_SPLIT(IIF(LEN(TRIM(@SystemCodes))=0, NULL, @SystemCodes), ',')\n)\nSELECT \nDISTINCT\nLEFT([SourceID], 2) [Order], M.[SystemCode]\nFROM [dbo].[ExtractLoadManifest] M\nJOIN [_SystemCodes] C ON C.[SystemCode] = M.[SystemCode] \nWHERE [Enabled] = 1 \nUNION \nSELECT \nDISTINCT\nLEFT([SourceID], 2) [Order], M.[SystemCode]\nFROM [dbo].[ExtractLoadManifest] M\nWHERE [Enabled] = 1 AND (SELECT COUNT(*) FROM [_SystemCodes]) = 0\nORDER BY 1",
+							"type": "Expression"
+						},
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "SQL_ControlDB",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "for-each-source",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "get-extract-load",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('get-extract-load').output.value",
+						"type": "Expression"
+					},
+					"isSequential": false,
+					"batchCount": 4,
+					"activities": [
+						{
+							"name": "execute-system",
+							"type": "ExecutePipeline",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "System",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"SystemCode": {
+										"value": "@item().SystemCode",
+										"type": "Expression"
+									},
+									"ParentBatchID": {
+										"value": "@variables('ParentBatchID')",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "set-parent-batch",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "ParentBatchID",
+					"value": {
+						"value": "@substring(pipeline().GroupId, 0,8)",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "if-transform",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "for-each-source",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@variables('Transform')",
+						"type": "Expression"
+					},
+					"ifTrueActivities": [
+						{
+							"name": "execute-transform",
+							"type": "ExecutePipeline",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "Transform",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"ParentBatchID": {
+										"value": "@variables('ParentBatchID')",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"SystemCodes": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"SystemCode": {
+				"type": "String"
+			},
+			"ParentBatchID": {
+				"type": "String"
+			},
+			"Transform": {
+				"type": "Boolean",
+				"defaultValue": true
+			}
+		},
+		"folder": {
+			"name": "ELT-Framework"
+		},
+		"annotations": [],
+		"lastPublishTime": "2021-07-08T02:50:54Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

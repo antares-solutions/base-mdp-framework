@@ -1,0 +1,38 @@
+{
+	"name": "AmazonS3",
+	"properties": {
+		"parameters": {
+			"systemName": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "AmazonS3",
+		"typeProperties": {
+			"serviceUrl": "",
+			"accessKeyId": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "AzureKeyVault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": {
+					"value": "@concat(linkedService().systemName, '-AccessKeyID-KVSecret')",
+					"type": "Expression"
+				}
+			},
+			"secretAccessKey": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "AzureKeyVault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": {
+					"value": "@concat(linkedService().systemName, '-SecretAccessKey-KVSecret')",
+					"type": "Expression"
+				}
+			},
+			"authenticationType": "AccessKey"
+		}
+	}
+}

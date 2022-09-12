@@ -1,0 +1,18 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+*.dbmdl
+*.cache
+*.jml
+*.suo
+*.dtbcache
+*.config
+*.v2
+*.sqlite
+*.sqlproj.user
+*.jfm
+Deploy-AzureResourceGroup.ps1
+/.vs
+/*/obj/Debug
+/*/bin/Debug

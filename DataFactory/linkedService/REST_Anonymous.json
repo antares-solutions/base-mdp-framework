@@ -1,0 +1,17 @@
+{
+	"name": "REST_Anonymous",
+	"properties": {
+		"parameters": {
+			"url": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "RestService",
+		"typeProperties": {
+			"url": "@{linkedService().url}",
+			"enableServerCertificateValidation": true,
+			"authenticationType": "Anonymous"
+		}
+	}
+}

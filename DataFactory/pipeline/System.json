@@ -1,0 +1,207 @@
+{
+	"name": "System",
+	"properties": {
+		"activities": [
+			{
+				"name": "get-tasks",
+				"description": "",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "set-parent-batch",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[dbo].[ExtractLoadInit]",
+						"storedProcedureParameters": {
+							"BatchID": {
+								"value": {
+									"value": "@variables('ParentBatchID')",
+									"type": "Expression"
+								}
+							},
+							"SystemCode": {
+								"value": {
+									"value": "@pipeline().parameters.SystemCode",
+									"type": "Expression"
+								}
+							}
+						},
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "SQL_ControlDB",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "for-each-raw",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "get-tasks",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('get-tasks').output.value",
+						"type": "Expression"
+					},
+					"isSequential": false,
+					"batchCount": 10,
+					"activities": [
+						{
+							"name": "execute-raw",
+							"type": "ExecutePipeline",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "Raw",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"task": {
+										"value": "@item()",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "set-parent-batch",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "ParentBatchID",
+					"value": {
+						"value": "@substring(coalesce(pipeline().parameters.ParentBatchID, pipeline().GroupId), 0,8)",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "for-each-trusted",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "for-each-raw",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('get-tasks').output.value",
+						"type": "Expression"
+					},
+					"isSequential": false,
+					"batchCount": 10,
+					"activities": [
+						{
+							"name": "execute-trusted",
+							"type": "ExecutePipeline",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "Trusted",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"task": {
+										"value": "@item()",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "end-system",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "for-each-trusted",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "UPDATE U\nSET [EndedDTS] = CONVERT(DATETIME, CONVERT(DATETIMEOFFSET, GETDATE()) AT TIME ZONE 'AUS Eastern Standard Time')\nFROM [dbo].[ExtractLoadStatus] U\nWHERE BatchID = '@{variables('ParentBatchID')}'\nAND SystemCode = '@{pipeline().parameters.SystemCode}'\nSELECT 1 A",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "SQL_ControlDB",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			}
+		],
+		"parameters": {
+			"SystemCode": {
+				"type": "string",
+				"defaultValue": "System"
+			},
+			"ParentBatchID": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"ParentBatchID": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "ELT-Framework"
+		},
+		"annotations": [],
+		"lastPublishTime": "2021-07-08T02:50:54Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

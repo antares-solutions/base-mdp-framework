@@ -1,0 +1,384 @@
+{
+	"name": "Curated",
+	"properties": {
+		"activities": [
+			{
+				"name": "switch-processor",
+				"type": "Switch",
+				"dependsOn": [
+					{
+						"activity": "log-status-start",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"on": {
+						"value": "@pipeline().parameters.task.ProcessorType",
+						"type": "Expression"
+					},
+					"cases": [
+						{
+							"value": "databricks-notebook",
+							"activities": [
+								{
+									"name": "curated-databricks",
+									"type": "DatabricksNotebook",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"notebookPath": {
+											"value": "/ELT-Framework/@{pipeline().parameters.task.Command}",
+											"type": "Expression"
+										},
+										"baseParameters": {
+											"task": {
+												"value": "@{pipeline().parameters.task}",
+												"type": "Expression"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "AzureDatabricks_defaultCluster",
+										"type": "LinkedServiceReference"
+									}
+								},
+								{
+									"name": "log-databricks",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "curated-databricks",
+											"dependencyConditions": [
+												"Completed"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "log-message",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": false,
+										"parameters": {
+											"ID": {
+												"value": "@pipeline().parameters.task.ID",
+												"type": "Expression"
+											},
+											"ActivityType": "curated-databricks",
+											"Message": {
+												"value": "@{activity('curated-databricks')}",
+												"type": "Expression"
+											},
+											"IsTransform": true
+										}
+									}
+								},
+								{
+									"name": "set-properties",
+									"type": "SetVariable",
+									"dependsOn": [
+										{
+											"activity": "curated-databricks",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "RunOutputProperties",
+										"value": {
+											"value": "@string(activity('curated-databricks').output.runOutput.Counts)",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "synapse-stored-procedure",
+							"activities": [
+								{
+									"name": "log-databricks_copy-synapse",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "synapse-stored-procedure",
+											"dependencyConditions": [
+												"Completed"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "log-message",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": false,
+										"parameters": {
+											"ID": {
+												"value": "@pipeline().parameters.task.ID",
+												"type": "Expression"
+											},
+											"ActivityType": "curated-databricks",
+											"Message": {
+												"value": "@{activity('synapse-stored-procedure')}",
+												"type": "Expression"
+											},
+											"IsTransform": true
+										}
+									}
+								},
+								{
+									"name": "set-properties_synapse",
+									"type": "SetVariable",
+									"dependsOn": [
+										{
+											"activity": "synapse-stored-procedure",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "RunOutputProperties",
+										"value": {
+											"value": "@string(activity('synapse-stored-procedure').output.firstRow.JsonOutput)",
+											"type": "Expression"
+										}
+									}
+								},
+								{
+									"name": "synapse-stored-procedure",
+									"type": "Lookup",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "SqlServerSource",
+											"sqlReaderStoredProcedureName": {
+												"value": "@{pipeline().parameters.task.Command}",
+												"type": "Expression"
+											},
+											"queryTimeout": "02:00:00",
+											"partitionOption": "None"
+										},
+										"dataset": {
+											"referenceName": "SQL_Server",
+											"type": "DatasetReference",
+											"parameters": {
+												"kvSecret": {
+													"value": "@{pipeline().parameters.task.TargetKeyVaultSecret}",
+													"type": "Expression"
+												}
+											}
+										}
+									}
+								}
+							]
+						}
+					]
+				}
+			},
+			{
+				"name": "log-status-start",
+				"type": "ExecutePipeline",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "log-status-update",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"ID": {
+							"value": "@pipeline().parameters.task.ID",
+							"type": "Expression"
+						},
+						"Property": "StartDTS",
+						"Value": {
+							"value": "@formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'yyyy-MM-dd HH:mm:ss')",
+							"type": "Expression"
+						},
+						"TableName": "TransformStatus"
+					}
+				}
+			},
+			{
+				"name": "log-status-end",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "switch-processor",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "log-status-update",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"ID": {
+							"value": "@pipeline().parameters.task.ID",
+							"type": "Expression"
+						},
+						"Property": "EndDTS",
+						"Value": {
+							"value": "@formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'yyyy-MM-dd HH:mm:ss')",
+							"type": "Expression"
+						},
+						"TableName": "TransformStatus"
+					}
+				}
+			},
+			{
+				"name": "log-status-fail",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "switch-processor",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "log-status-update",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"ID": {
+							"value": "@pipeline().parameters.task.ID",
+							"type": "Expression"
+						},
+						"Property": "Status",
+						"Value": "Failed",
+						"TableName": "TransformStatus"
+					}
+				}
+			},
+			{
+				"name": "log-status-success",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "switch-processor",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "log-status-update",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"ID": {
+							"value": "@pipeline().parameters.task.ID",
+							"type": "Expression"
+						},
+						"Property": "Status",
+						"Value": "Success",
+						"TableName": "TransformStatus"
+					}
+				}
+			},
+			{
+				"name": "for-each-property",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "switch-processor",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@split(replace(replace(\nvariables('RunOutputProperties')\n, '}', '')\n, '{', '')\n, ',')",
+						"type": "Expression"
+					},
+					"isSequential": false,
+					"activities": [
+						{
+							"name": "log-property",
+							"type": "ExecutePipeline",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "log-status-update",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": false,
+								"parameters": {
+									"ID": {
+										"value": "@pipeline().parameters.task.ID",
+										"type": "Expression"
+									},
+									"Property": {
+										"value": "@replace(split(item(), ':')[0], '\"', '')",
+										"type": "Expression"
+									},
+									"Value": {
+										"value": "@split(item(), ':')[1]",
+										"type": "Expression"
+									},
+									"TableName": "TransformStatus"
+								}
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"task": {
+				"type": "object"
+			}
+		},
+		"variables": {
+			"RunOutputProperties": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "ELT-Framework/Zone"
+		},
+		"annotations": []
+	}
+}

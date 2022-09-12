@@ -1,0 +1,414 @@
+{
+	"name": "synapse-operation",
+	"properties": {
+		"activities": [
+			{
+				"name": "get-token",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "get-tenant",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "get-client-id",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "get-client-secret",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "https://login.microsoftonline.com/@{activity('get-tenant').output.value}/oauth2/token",
+						"type": "Expression"
+					},
+					"method": "POST",
+					"headers": {
+						"Content-Type": "application/x-www-form-urlencoded"
+					},
+					"body": {
+						"value": "grant_type=client_credentials&client_id=@{activity('get-client-id').output.value}&client_secret=@{activity('get-client-secret').output.value}&resource=https://management.azure.com",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "get-status",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "set-endpoint",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@{variables('endpoint-url')}?api-version=2021-06-01",
+						"type": "Expression"
+					},
+					"method": "GET",
+					"headers": {
+						"authorization": {
+							"value": "Bearer @{variables('token')}",
+							"type": "Expression"
+						}
+					},
+					"body": "\"\""
+				}
+			},
+			{
+				"name": "if-different-status",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "set-status",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@or(\nand(equals(variables('status'), 'Paused'), equals(pipeline().parameters.operation, 'pause'))\n,and(equals(variables('status'), 'Online'), equals(pipeline().parameters.operation, 'resume')))",
+						"type": "Expression"
+					},
+					"ifFalseActivities": [
+						{
+							"name": "synapse-operation",
+							"type": "WebActivity",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"url": {
+									"value": "@{variables('endpoint-url')}/@{pipeline().parameters.operation}?api-version=2021-06-01",
+									"type": "Expression"
+								},
+								"method": "POST",
+								"headers": {
+									"authorization": {
+										"value": "Bearer @{variables('token')}",
+										"type": "Expression"
+									}
+								},
+								"body": "\"\""
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "set-status",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "get-status",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "status",
+					"value": {
+						"value": "@activity('get-status').output.properties.status",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "set-token",
+				"description": "",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "get-token",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "token",
+					"value": {
+						"value": "@activity('get-token').output.access_token",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "get-tenant",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "https://@{pipeline().globalParameters.keyVaultName}.vault.azure.net/secrets/TenantID?api-version=7.0",
+						"type": "Expression"
+					},
+					"method": "GET",
+					"linkedServices": [
+						{
+							"referenceName": "AzureKeyVault",
+							"type": "LinkedServiceReference"
+						}
+					],
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "get-client-id",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "https://@{pipeline().globalParameters.keyVaultName}.vault.azure.net/secrets/Service-Principal-ApplicationID?api-version=7.0",
+						"type": "Expression"
+					},
+					"method": "GET",
+					"linkedServices": [
+						{
+							"referenceName": "AzureKeyVault",
+							"type": "LinkedServiceReference"
+						}
+					],
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "get-client-secret",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "https://@{pipeline().globalParameters.keyVaultName}.vault.azure.net/secrets/Service-Principal-Secret?api-version=7.0",
+						"type": "Expression"
+					},
+					"method": "GET",
+					"linkedServices": [
+						{
+							"referenceName": "AzureKeyVault",
+							"type": "LinkedServiceReference"
+						}
+					],
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "get-subscription-id",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "https://@{pipeline().globalParameters.keyVaultName}.vault.azure.net/secrets/Subscription-ID?api-version=7.0",
+						"type": "Expression"
+					},
+					"method": "GET",
+					"linkedServices": [
+						{
+							"referenceName": "AzureKeyVault",
+							"type": "LinkedServiceReference"
+						}
+					],
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "get-resource-group-name",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "https://@{pipeline().globalParameters.keyVaultName}.vault.azure.net/secrets/Resource-Group-Name?api-version=7.0",
+						"type": "Expression"
+					},
+					"method": "GET",
+					"linkedServices": [
+						{
+							"referenceName": "AzureKeyVault",
+							"type": "LinkedServiceReference"
+						}
+					],
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "set-endpoint",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "set-token",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "get-subscription-id",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "get-resource-group-name",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "get-synapse-instance",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "endpoint-url",
+					"value": {
+						"value": "https://management.azure.com/subscriptions/@{activity('get-subscription-id').output.value}/resourceGroups/@{activity('get-resource-group-name').output.value}/providers/Microsoft.Synapse/workspaces/@{split(split(split(activity('get-synapse-instance').output.value, 'data source=')[1], ';')[0], '.')[0]}/sqlPools/@{split(split(split(activity('get-synapse-instance').output.value, 'initial catalog=')[1], ';')[0], '.')[0]}",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "get-synapse-instance",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "https://@{pipeline().globalParameters.keyVaultName}.vault.azure.net/secrets/ADF-Synase-EDW-PRES?api-version=7.0",
+						"type": "Expression"
+					},
+					"method": "GET",
+					"linkedServices": [
+						{
+							"referenceName": "AzureKeyVault",
+							"type": "LinkedServiceReference"
+						}
+					],
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"operation": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"status": {
+				"type": "String"
+			},
+			"token": {
+				"type": "String"
+			},
+			"endpoint-url": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "ELT-Framework/Management/Synapse"
+		},
+		"annotations": []
+	}
+}

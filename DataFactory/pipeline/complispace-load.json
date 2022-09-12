@@ -1,0 +1,421 @@
+{
+	"name": "complispace-load",
+	"properties": {
+		"activities": [
+			{
+				"name": "get-token",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "get-client-id",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "get-secret",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": "https://auth.go1.com/oauth/token",
+					"method": "POST",
+					"body": {
+						"value": "{\n\"client_id\":\"@{activity('get-client-id').output.value}\"\n,\"client_secret\":\"@{activity('get-secret').output.value}\"\n,\"grant_type\":\"client_credentials\"\n}",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "set-token",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "get-token",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "set-url",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "set-root-folder",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "token",
+					"value": {
+						"value": "@activity('get-token').output.access_token",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "get-count",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "set-token",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@{variables('url')}?limit=0",
+						"type": "Expression"
+					},
+					"method": "GET",
+					"headers": {
+						"Authorization": {
+							"value": "Bearer @{variables('token')}",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "while-next-offset",
+				"type": "Until",
+				"dependsOn": [
+					{
+						"activity": "set-total",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@greaterOrEquals(int(variables('counter')), int(variables('total')))",
+						"type": "Expression"
+					},
+					"activities": [
+						{
+							"name": "copy-data",
+							"type": "Copy",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "RestSource",
+									"httpRequestTimeout": "00:01:40",
+									"requestInterval": "00.00:00:00.010",
+									"requestMethod": "GET",
+									"additionalHeaders": {
+										"Authorization": {
+											"value": "Bearer @{variables('token')}",
+											"type": "Expression"
+										}
+									},
+									"paginationRules": {
+										"supportRFC5988": "true"
+									}
+								},
+								"sink": {
+									"type": "JsonSink",
+									"storeSettings": {
+										"type": "AzureBlobFSWriteSettings"
+									},
+									"formatSettings": {
+										"type": "JsonWriteSettings"
+									}
+								},
+								"enableStaging": false
+							},
+							"inputs": [
+								{
+									"referenceName": "REST_Binary",
+									"type": "DatasetReference",
+									"parameters": {
+										"url": {
+											"value": "@{variables('url')}?limit=@{variables('offset-size')}&offset=@{variables('counter')}",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "DLS_Json",
+									"type": "DatasetReference",
+									"parameters": {
+										"filePath": {
+											"value": "@replace(replace(\n'$ROOT$/$guid$.json'\n,'$ROOT$', variables('rootFolder'))\n,'$guid$', guid())",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"name": "set-counter",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "set-last",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "counter",
+								"value": {
+									"value": "@{add(int(variables('last')), int(variables('offset-size')))}",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "set-last",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "copy-data",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "last",
+								"value": {
+									"value": "@variables('counter')",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "break-counter",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "copy-data",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "counter",
+								"value": "999999999"
+							}
+						}
+					],
+					"timeout": "7.00:00:00"
+				}
+			},
+			{
+				"name": "set-total",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "get-count",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "total",
+					"value": {
+						"value": "@{activity('get-count').output.total}",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "get-client-id",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "https://@{pipeline().globalParameters.keyVaultName}.vault.azure.net/secrets/CompliSpace-ClientID?api-version=7.0",
+						"type": "Expression"
+					},
+					"method": "GET",
+					"linkedServices": [
+						{
+							"referenceName": "AzureKeyVault",
+							"type": "LinkedServiceReference"
+						}
+					],
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "get-secret",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "https://@{pipeline().globalParameters.keyVaultName}.vault.azure.net/secrets/CompliSpace-Secret?api-version=7.0",
+						"type": "Expression"
+					},
+					"method": "GET",
+					"linkedServices": [
+						{
+							"referenceName": "AzureKeyVault",
+							"type": "LinkedServiceReference"
+						}
+					],
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "set-url",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "url",
+					"value": {
+						"value": "@pipeline().parameters.task.SourceQuery",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "set-root-folder",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "rootFolder",
+					"value": {
+						"value": "@replace(replace(replace(replace(replace(replace(\npipeline().parameters.task.RawPath\n,'$yyyy$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'yyyy'))\n,'$MM$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'MM'))\n,'$dd$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'dd'))\n,'$HH$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'HH'))\n,'$mm$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'mm'))\n,'$guid$.json', '')",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "task-raw-path",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "set-root-folder",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "log-status-update",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": false,
+					"parameters": {
+						"ID": {
+							"value": "@pipeline().parameters.task.ID",
+							"type": "Expression"
+						},
+						"Property": "RawPath",
+						"Value": {
+							"value": "@variables('rootFolder')",
+							"type": "Expression"
+						}
+					}
+				}
+			}
+		],
+		"parameters": {
+			"task": {
+				"type": "object"
+			}
+		},
+		"variables": {
+			"token": {
+				"type": "String"
+			},
+			"total": {
+				"type": "String"
+			},
+			"counter": {
+				"type": "String",
+				"defaultValue": "0"
+			},
+			"last": {
+				"type": "String",
+				"defaultValue": "0"
+			},
+			"offset-size": {
+				"type": "String",
+				"defaultValue": "50"
+			},
+			"url": {
+				"type": "String"
+			},
+			"rootFolder": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "ELT-Framework/SourceHandler/CompliSpace"
+		},
+		"annotations": []
+	}
+}

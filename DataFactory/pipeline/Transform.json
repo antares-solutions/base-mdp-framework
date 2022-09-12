@@ -1,0 +1,343 @@
+{
+	"name": "Transform",
+	"properties": {
+		"activities": [
+			{
+				"name": "get-transform",
+				"description": "",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "set-parent-batch",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[dbo].[TransformInit]",
+						"storedProcedureParameters": {
+							"BatchID": {
+								"value": {
+									"value": "@variables('ParentBatchID')",
+									"type": "Expression"
+								}
+							}
+						},
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "SQL_ControlDB",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "set-list",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "get-transform",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "list",
+					"value": {
+						"value": "@activity('get-transform').output.value",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "for-each-group",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "if-synapse-resume",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@split(string(variables('list')[0].List), ',')",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "if-failed",
+							"type": "IfCondition",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"expression": {
+									"value": "@equals(variables('has-failed'), bool(1))",
+									"type": "Expression"
+								},
+								"ifFalseActivities": [
+									{
+										"name": "filter-grouping",
+										"type": "Filter",
+										"dependsOn": [
+											{
+												"activity": "set-current-group",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"userProperties": [],
+										"typeProperties": {
+											"items": {
+												"value": "@variables('list')",
+												"type": "Expression"
+											},
+											"condition": {
+												"value": "@equals(int(item().ParallelGroup), int(variables('current-group')))",
+												"type": "Expression"
+											}
+										}
+									},
+									{
+										"name": "set-current-group",
+										"type": "SetVariable",
+										"dependsOn": [],
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "current-group",
+											"value": {
+												"value": "@item()",
+												"type": "Expression"
+											}
+										}
+									},
+									{
+										"name": "execute-curated-parallel",
+										"type": "ExecutePipeline",
+										"dependsOn": [
+											{
+												"activity": "filter-grouping",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"userProperties": [],
+										"typeProperties": {
+											"pipeline": {
+												"referenceName": "Curated-Parallel",
+												"type": "PipelineReference"
+											},
+											"waitOnCompletion": true,
+											"parameters": {
+												"taskList": {
+													"value": "@activity('filter-grouping').output.value",
+													"type": "Expression"
+												}
+											}
+										}
+									},
+									{
+										"name": "set-has-failed",
+										"type": "SetVariable",
+										"dependsOn": [
+											{
+												"activity": "execute-curated-parallel",
+												"dependencyConditions": [
+													"Failed"
+												]
+											}
+										],
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "has-failed",
+											"value": true
+										}
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "if-fail-pipeline",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "for-each-group",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@equals(variables('has-failed'), bool(1))",
+						"type": "Expression"
+					},
+					"ifTrueActivities": [
+						{
+							"name": "fail-pipeline",
+							"type": "Fail",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"message": "Inner pipeline failed",
+								"errorCode": "-1"
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "distinct-processors",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "set-list",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('get-transform').output.value",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "if-synapse-processing",
+							"type": "IfCondition",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"expression": {
+									"value": "@and(contains(item().ProcessorType, 'synapse')\n,not(contains(variables('list'), item().ProcessorType)))",
+									"type": "Expression"
+								},
+								"ifTrueActivities": [
+									{
+										"name": "append-list",
+										"type": "AppendVariable",
+										"dependsOn": [],
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "distinct-list",
+											"value": {
+												"value": "@item().ProcessorType",
+												"type": "Expression"
+											}
+										}
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "if-synapse-resume",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "distinct-processors",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@less(length(variables('list')), -1)",
+						"type": "Expression"
+					},
+					"ifTrueActivities": [
+						{
+							"name": "resume-synapse",
+							"type": "ExecutePipeline",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "synapse-operation",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"operation": "resume"
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "set-parent-batch",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "ParentBatchID",
+					"value": {
+						"value": "@substring(coalesce(pipeline().parameters.ParentBatchID, pipeline().GroupId), 0,8)",
+						"type": "Expression"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"ParentBatchID": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"list": {
+				"type": "Array"
+			},
+			"current-group": {
+				"type": "String"
+			},
+			"filtered-list": {
+				"type": "Array"
+			},
+			"has-failed": {
+				"type": "Boolean",
+				"defaultValue": false
+			},
+			"distinct-list": {
+				"type": "Array"
+			},
+			"ParentBatchID": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "ELT-Framework"
+		},
+		"annotations": []
+	}
+}

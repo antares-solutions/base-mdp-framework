@@ -1,0 +1,3825 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"type": "string",
+			"metadata": "Data Factory name",
+			"defaultValue": "adf-base-mdp-dev-01"
+		}
+	},
+	"variables": {
+		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+	},
+	"resources": [
+		{
+			"name": "[concat(parameters('factoryName'), '/DLS_Json')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureDataLakeStorage",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"filePath": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/DLS"
+				},
+				"annotations": [],
+				"type": "Json",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileName": {
+							"value": "@dataset().filePath",
+							"type": "Expression"
+						}
+					}
+				},
+				"schema": {}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DLS_Parquet')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureDataLakeStorage",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"BlobPath": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/DLS"
+				},
+				"annotations": [],
+				"type": "Parquet",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileName": {
+							"value": "@dataset().BlobPath",
+							"type": "Expression"
+						}
+					},
+					"compressionCodec": "snappy"
+				},
+				"schema": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/S3_Binary')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AmazonS3",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"systemName": {
+							"value": "@dataset().s3KVSecret",
+							"type": "Expression"
+						}
+					}
+				},
+				"parameters": {
+					"filePath": {
+						"type": "string"
+					},
+					"s3KVSecret": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/S3"
+				},
+				"annotations": [],
+				"type": "Binary",
+				"typeProperties": {
+					"location": {
+						"type": "AmazonS3Location",
+						"bucketName": {
+							"value": "\"\"",
+							"type": "Expression"
+						},
+						"fileName": {
+							"value": "@dataset().filePath",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/S3_Binary_Folder')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AmazonS3",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"systemName": {
+							"value": "@dataset().s3KVSecret",
+							"type": "Expression"
+						}
+					}
+				},
+				"parameters": {
+					"folderPath": {
+						"type": "string"
+					},
+					"s3KVSecret": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/S3"
+				},
+				"annotations": [],
+				"type": "Binary",
+				"typeProperties": {
+					"location": {
+						"type": "AmazonS3Location",
+						"bucketName": {
+							"value": "@dataset().folderPath",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/SFTP_Binary')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "SFTP_Basic",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"path": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/SFTP"
+				},
+				"annotations": [],
+				"type": "Binary",
+				"typeProperties": {
+					"location": {
+						"type": "SftpLocation",
+						"fileName": {
+							"value": "@dataset().path",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/SQL_ControlDB')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureSqlDatabase_Ctrldb",
+					"type": "LinkedServiceReference"
+				},
+				"folder": {
+					"name": "ELT-Framework/SQL"
+				},
+				"annotations": [],
+				"type": "AzureSqlTable",
+				"schema": [],
+				"typeProperties": {}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/SQL_Server')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "SQLServer",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"kvSecret": "@dataset().kvSecret"
+					}
+				},
+				"parameters": {
+					"kvSecret": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/SQL"
+				},
+				"annotations": [],
+				"type": "SqlServerTable",
+				"schema": [],
+				"typeProperties": {}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/SQL_Server_Table')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "SQLServer",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"kvSecret": "@dataset().kvSecret"
+					}
+				},
+				"parameters": {
+					"kvSecret": {
+						"type": "string"
+					},
+					"schemaName": {
+						"type": "string"
+					},
+					"tableName": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/SQL"
+				},
+				"annotations": [],
+				"type": "SqlServerTable",
+				"schema": [],
+				"typeProperties": {
+					"schema": {
+						"value": "@dataset().schemaName",
+						"type": "Expression"
+					},
+					"table": {
+						"value": "@dataset().tableName",
+						"type": "Expression"
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Curated')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "switch-processor",
+						"type": "Switch",
+						"dependsOn": [
+							{
+								"activity": "log-status-start",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"on": {
+								"value": "@pipeline().parameters.task.ProcessorType",
+								"type": "Expression"
+							},
+							"cases": [
+								{
+									"value": "databricks-notebook",
+									"activities": [
+										{
+											"name": "curated-databricks",
+											"type": "DatabricksNotebook",
+											"dependsOn": [],
+											"policy": {
+												"timeout": "7.00:00:00",
+												"retry": 0,
+												"retryIntervalInSeconds": 30,
+												"secureOutput": false,
+												"secureInput": false
+											},
+											"userProperties": [],
+											"typeProperties": {
+												"notebookPath": {
+													"value": "/ELT-Framework/@{pipeline().parameters.task.Command}",
+													"type": "Expression"
+												},
+												"baseParameters": {
+													"task": {
+														"value": "@{pipeline().parameters.task}",
+														"type": "Expression"
+													}
+												}
+											},
+											"linkedServiceName": {
+												"referenceName": "AzureDatabricks_defaultCluster",
+												"type": "LinkedServiceReference"
+											}
+										},
+										{
+											"name": "log-databricks",
+											"type": "ExecutePipeline",
+											"dependsOn": [
+												{
+													"activity": "curated-databricks",
+													"dependencyConditions": [
+														"Completed"
+													]
+												}
+											],
+											"userProperties": [],
+											"typeProperties": {
+												"pipeline": {
+													"referenceName": "log-message",
+													"type": "PipelineReference"
+												},
+												"waitOnCompletion": false,
+												"parameters": {
+													"ID": {
+														"value": "@pipeline().parameters.task.ID",
+														"type": "Expression"
+													},
+													"ActivityType": "curated-databricks",
+													"Message": {
+														"value": "@{activity('curated-databricks')}",
+														"type": "Expression"
+													},
+													"IsTransform": true
+												}
+											}
+										},
+										{
+											"name": "set-properties",
+											"type": "SetVariable",
+											"dependsOn": [
+												{
+													"activity": "curated-databricks",
+													"dependencyConditions": [
+														"Succeeded"
+													]
+												}
+											],
+											"userProperties": [],
+											"typeProperties": {
+												"variableName": "RunOutputProperties",
+												"value": {
+													"value": "@string(activity('curated-databricks').output.runOutput.Counts)",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								},
+								{
+									"value": "synapse-stored-procedure",
+									"activities": [
+										{
+											"name": "log-databricks_copy-synapse",
+											"type": "ExecutePipeline",
+											"dependsOn": [
+												{
+													"activity": "synapse-stored-procedure",
+													"dependencyConditions": [
+														"Completed"
+													]
+												}
+											],
+											"userProperties": [],
+											"typeProperties": {
+												"pipeline": {
+													"referenceName": "log-message",
+													"type": "PipelineReference"
+												},
+												"waitOnCompletion": false,
+												"parameters": {
+													"ID": {
+														"value": "@pipeline().parameters.task.ID",
+														"type": "Expression"
+													},
+													"ActivityType": "curated-databricks",
+													"Message": {
+														"value": "@{activity('synapse-stored-procedure')}",
+														"type": "Expression"
+													},
+													"IsTransform": true
+												}
+											}
+										},
+										{
+											"name": "set-properties_synapse",
+											"type": "SetVariable",
+											"dependsOn": [
+												{
+													"activity": "synapse-stored-procedure",
+													"dependencyConditions": [
+														"Succeeded"
+													]
+												}
+											],
+											"userProperties": [],
+											"typeProperties": {
+												"variableName": "RunOutputProperties",
+												"value": {
+													"value": "@string(activity('synapse-stored-procedure').output.firstRow.JsonOutput)",
+													"type": "Expression"
+												}
+											}
+										},
+										{
+											"name": "synapse-stored-procedure",
+											"type": "Lookup",
+											"dependsOn": [],
+											"policy": {
+												"timeout": "7.00:00:00",
+												"retry": 0,
+												"retryIntervalInSeconds": 30,
+												"secureOutput": false,
+												"secureInput": false
+											},
+											"userProperties": [],
+											"typeProperties": {
+												"source": {
+													"type": "SqlServerSource",
+													"sqlReaderStoredProcedureName": {
+														"value": "@{pipeline().parameters.task.Command}",
+														"type": "Expression"
+													},
+													"queryTimeout": "02:00:00",
+													"partitionOption": "None"
+												},
+												"dataset": {
+													"referenceName": "SQL_Server",
+													"type": "DatasetReference",
+													"parameters": {
+														"kvSecret": {
+															"value": "@{pipeline().parameters.task.TargetKeyVaultSecret}",
+															"type": "Expression"
+														}
+													}
+												}
+											}
+										}
+									]
+								}
+							]
+						}
+					},
+					{
+						"name": "log-status-start",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "log-status-update",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"ID": {
+									"value": "@pipeline().parameters.task.ID",
+									"type": "Expression"
+								},
+								"Property": "StartDTS",
+								"Value": {
+									"value": "@formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'yyyy-MM-dd HH:mm:ss')",
+									"type": "Expression"
+								},
+								"TableName": "TransformStatus"
+							}
+						}
+					},
+					{
+						"name": "log-status-end",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "switch-processor",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "log-status-update",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"ID": {
+									"value": "@pipeline().parameters.task.ID",
+									"type": "Expression"
+								},
+								"Property": "EndDTS",
+								"Value": {
+									"value": "@formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'yyyy-MM-dd HH:mm:ss')",
+									"type": "Expression"
+								},
+								"TableName": "TransformStatus"
+							}
+						}
+					},
+					{
+						"name": "log-status-fail",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "switch-processor",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "log-status-update",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"ID": {
+									"value": "@pipeline().parameters.task.ID",
+									"type": "Expression"
+								},
+								"Property": "Status",
+								"Value": "Failed",
+								"TableName": "TransformStatus"
+							}
+						}
+					},
+					{
+						"name": "log-status-success",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "switch-processor",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "log-status-update",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"ID": {
+									"value": "@pipeline().parameters.task.ID",
+									"type": "Expression"
+								},
+								"Property": "Status",
+								"Value": "Success",
+								"TableName": "TransformStatus"
+							}
+						}
+					},
+					{
+						"name": "for-each-property",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "switch-processor",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@split(replace(replace(\nvariables('RunOutputProperties')\n, '}', '')\n, '{', '')\n, ',')",
+								"type": "Expression"
+							},
+							"isSequential": false,
+							"activities": [
+								{
+									"name": "log-property",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "log-status-update",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": false,
+										"parameters": {
+											"ID": {
+												"value": "@pipeline().parameters.task.ID",
+												"type": "Expression"
+											},
+											"Property": {
+												"value": "@replace(split(item(), ':')[0], '\"', '')",
+												"type": "Expression"
+											},
+											"Value": {
+												"value": "@split(item(), ':')[1]",
+												"type": "Expression"
+											},
+											"TableName": "TransformStatus"
+										}
+									}
+								}
+							]
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"task": {
+						"type": "object"
+					}
+				},
+				"variables": {
+					"RunOutputProperties": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/Zone"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/SQL_Server')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Trusted')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "if-trusted-handler",
+						"type": "IfCondition",
+						"dependsOn": [
+							{
+								"activity": "log-status-start",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@not(empty(pipeline().parameters.task.TrustedHandler))",
+								"type": "Expression"
+							},
+							"ifTrueActivities": [
+								{
+									"name": "trusted-databricks",
+									"type": "DatabricksNotebook",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"notebookPath": {
+											"value": "/ELT-Framework/Zone/@{pipeline().parameters.task.TrustedHandler}",
+											"type": "Expression"
+										},
+										"baseParameters": {
+											"task": {
+												"value": "@{pipeline().parameters.task}",
+												"type": "Expression"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "AzureDatabricks_defaultCluster",
+										"type": "LinkedServiceReference"
+									}
+								},
+								{
+									"name": "log-databricks",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "trusted-databricks",
+											"dependencyConditions": [
+												"Completed"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "log-message",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": false,
+										"parameters": {
+											"ID": {
+												"value": "@pipeline().parameters.task.ID",
+												"type": "Expression"
+											},
+											"ActivityType": "trusted-databricks",
+											"Message": {
+												"value": "@{activity('trusted-databricks')}",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "log-status-start",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "log-status-update",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"ID": {
+									"value": "@pipeline().parameters.task.ID",
+									"type": "Expression"
+								},
+								"Property": "TrustedStartDTS",
+								"Value": {
+									"value": "@formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'yyyy-MM-dd HH:mm:ss')",
+									"type": "Expression"
+								},
+								"TableName": "ExtractLoadStatus"
+							}
+						}
+					},
+					{
+						"name": "log-status-end",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "if-trusted-handler",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "log-status-update",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"ID": {
+									"value": "@pipeline().parameters.task.ID",
+									"type": "Expression"
+								},
+								"Property": "TrustedEndDTS",
+								"Value": {
+									"value": "@formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'yyyy-MM-dd HH:mm:ss')",
+									"type": "Expression"
+								},
+								"TableName": "ExtractLoadStatus"
+							}
+						}
+					},
+					{
+						"name": "log-status-fail",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "if-trusted-handler",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "log-status-update",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"ID": {
+									"value": "@pipeline().parameters.task.ID",
+									"type": "Expression"
+								},
+								"Property": "TrustedStatus",
+								"Value": "Fail",
+								"TableName": "ExtractLoadStatus"
+							}
+						}
+					},
+					{
+						"name": "log-status-success",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "if-trusted-handler",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "log-status-update",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"ID": {
+									"value": "@pipeline().parameters.task.ID",
+									"type": "Expression"
+								},
+								"Property": "TrustedStatus",
+								"Value": "Success",
+								"TableName": "ExtractLoadStatus"
+							}
+						}
+					},
+					{
+						"name": "log-status-end-fail",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "if-trusted-handler",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "log-status-update",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"ID": {
+									"value": "@pipeline().parameters.task.ID",
+									"type": "Expression"
+								},
+								"Property": "TrustedEndDTS",
+								"Value": {
+									"value": "@formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'yyyy-MM-dd HH:mm:ss')",
+									"type": "Expression"
+								},
+								"TableName": "ExtractLoadStatus"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"task": {
+						"type": "object"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/Zone"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/canvas-graphql-load-by-course')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "get-token",
+						"type": "WebActivity",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": true,
+							"secureInput": true
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"url": {
+								"value": "https://@{pipeline().globalParameters.keyVaultName}.vault.azure.net/secrets/Canvas-API-Key?api-version=7.0",
+								"type": "Expression"
+							},
+							"method": "GET",
+							"headers": {},
+							"linkedServices": [
+								{
+									"referenceName": "AzureKeyVault",
+									"type": "LinkedServiceReference"
+								}
+							],
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://vault.azure.net"
+							}
+						}
+					},
+					{
+						"name": "get-domain",
+						"type": "WebActivity",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"url": {
+								"value": "https://@{pipeline().globalParameters.keyVaultName}.vault.azure.net/secrets/Canvas-Domain?api-version=7.0",
+								"type": "Expression"
+							},
+							"method": "GET",
+							"headers": {},
+							"linkedServices": [
+								{
+									"referenceName": "AzureKeyVault",
+									"type": "LinkedServiceReference"
+								}
+							],
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://vault.azure.net"
+							}
+						}
+					},
+					{
+						"name": "set-url",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "get-domain",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "currentUrl",
+							"value": {
+								"value": "@concat(replace(\n'https://{canvas-domain}/api/graphql'\n, '{canvas-domain}', activity('get-domain').output.value)\n, '?per_page=100')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "set-root-folder",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "rootFolder",
+							"value": {
+								"value": "@replace(replace(replace(replace(replace(replace(\npipeline().parameters.task.RawPath\n,'$yyyy$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'yyyy'))\n,'$MM$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'MM'))\n,'$dd$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'dd'))\n,'$HH$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'HH'))\n,'$mm$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'mm'))\n,'$guid$.json', '')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "get-all-courses",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "get-token",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "set-url",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 1,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"url": {
+								"value": "@variables('currentUrl')",
+								"type": "Expression"
+							},
+							"method": "POST",
+							"headers": {
+								"Authorization": {
+									"value": "Bearer @{activity('get-token').output.value}",
+									"type": "Expression"
+								},
+								"Content-Type": "multipart/form-data"
+							},
+							"body": {
+								"value": "query=query {\n  account(id: \"111\") {\n    coursesConnection {\n      nodes {\n        _id\n      }\n    }\n  }\n}\n",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "set-all-courses",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "get-all-courses",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "allCourses",
+							"value": {
+								"value": "@activity('get-all-courses').output.data.account.coursesConnection.nodes",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "for-each-course",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "set-all-courses",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "set-root-folder",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@variables('allCourses')",
+								"type": "Expression"
+							},
+							"batchCount": 10,
+							"activities": [
+								{
+									"name": "copy-rest",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "RestSource",
+											"httpRequestTimeout": "00:05:00",
+											"requestInterval": "00.00:00:00.010",
+											"requestMethod": "POST",
+											"requestBody": {
+												"value": "@replace(pipeline().parameters.task.SourceQuery,'{course_id}', string(item()._id))",
+												"type": "Expression"
+											},
+											"additionalHeaders": {
+												"Authorization": {
+													"value": "Bearer @{activity('get-token').output.value}",
+													"type": "Expression"
+												},
+												"Content-Type": "multipart/form-data"
+											},
+											"paginationRules": {
+												"supportRFC5988": "true"
+											}
+										},
+										"sink": {
+											"type": "JsonSink",
+											"storeSettings": {
+												"type": "AzureBlobFSWriteSettings"
+											},
+											"formatSettings": {
+												"type": "JsonWriteSettings"
+											}
+										},
+										"enableStaging": false
+									},
+									"inputs": [
+										{
+											"referenceName": "REST_Binary",
+											"type": "DatasetReference",
+											"parameters": {
+												"url": "@variables('currentUrl')"
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "DLS_Json",
+											"type": "DatasetReference",
+											"parameters": {
+												"filePath": {
+													"value": "@replace(replace(\n'$ROOT$/$guid$.json'\n,'$ROOT$', variables('rootFolder'))\n,'$guid$', guid())",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								}
+							]
+						}
+					},
+					{
+						"name": "task-raw-path",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "set-root-folder",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "log-status-update",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"ID": {
+									"value": "@pipeline().parameters.task.ID",
+									"type": "Expression"
+								},
+								"Property": "RawPath",
+								"Value": {
+									"value": "@variables('rootFolder')",
+									"type": "Expression"
+								}
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"task": {
+						"type": "object"
+					}
+				},
+				"variables": {
+					"currentUrl": {
+						"type": "String"
+					},
+					"rootFolder": {
+						"type": "String"
+					},
+					"apiResponeseProperty": {
+						"type": "String"
+					},
+					"allCourses": {
+						"type": "Array"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/SourceHandler/Canvas"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DLS_Json')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/canvas-graphql-load')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "get-token",
+						"type": "WebActivity",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": true,
+							"secureInput": true
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"url": {
+								"value": "https://@{pipeline().globalParameters.keyVaultName}.vault.azure.net/secrets/Canvas-API-Key?api-version=7.0",
+								"type": "Expression"
+							},
+							"method": "GET",
+							"headers": {},
+							"linkedServices": [
+								{
+									"referenceName": "AzureKeyVault",
+									"type": "LinkedServiceReference"
+								}
+							],
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://vault.azure.net"
+							}
+						}
+					},
+					{
+						"name": "get-domain",
+						"type": "WebActivity",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"url": {
+								"value": "https://@{pipeline().globalParameters.keyVaultName}.vault.azure.net/secrets/Canvas-Domain?api-version=7.0",
+								"type": "Expression"
+							},
+							"method": "GET",
+							"headers": {},
+							"linkedServices": [
+								{
+									"referenceName": "AzureKeyVault",
+									"type": "LinkedServiceReference"
+								}
+							],
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://vault.azure.net"
+							}
+						}
+					},
+					{
+						"name": "set-url",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "get-domain",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "currentUrl",
+							"value": {
+								"value": "@concat(replace(\n'https://{canvas-domain}/api/graphql'\n, '{canvas-domain}', activity('get-domain').output.value)\n, '?per_page=100')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "while-next-link",
+						"type": "Until",
+						"dependsOn": [
+							{
+								"activity": "get-token",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "set-url",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "set-root-folder",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@equals(length(variables('currentUrl')), 0)",
+								"type": "Expression"
+							},
+							"activities": [
+								{
+									"name": "invoke-api",
+									"type": "WebActivity",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 1,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"url": {
+											"value": "@variables('currentUrl')",
+											"type": "Expression"
+										},
+										"method": "POST",
+										"headers": {
+											"Authorization": {
+												"value": "Bearer @{activity('get-token').output.value}",
+												"type": "Expression"
+											},
+											"Content-Type": "multipart/form-data"
+										},
+										"body": {
+											"value": "@pipeline().parameters.task.SourceQuery",
+											"type": "Expression"
+										}
+									}
+								},
+								{
+									"name": "save-file",
+									"type": "WebActivity",
+									"dependsOn": [
+										{
+											"activity": "invoke-api",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"url": {
+											"value": "@replace(replace(replace(\n'https://$STORAGE$.blob.core.windows.net$ROOT$/$guid$.json?resource=filesystem'\n,'$STORAGE$', pipeline().globalParameters.storageName)\n,'$ROOT$', variables('rootFolder'))\n,'$guid$', guid())",
+											"type": "Expression"
+										},
+										"method": "PUT",
+										"headers": {
+											"x-ms-version": "2017-11-09",
+											"x-ms-blob-type": "BlockBlob"
+										},
+										"body": {
+											"value": "@{activity('invoke-api').output.data}",
+											"type": "Expression"
+										},
+										"authentication": {
+											"type": "MSI",
+											"resource": "https://storage.azure.com/"
+										}
+									}
+								},
+								{
+									"name": "if-next-link",
+									"type": "IfCondition",
+									"dependsOn": [
+										{
+											"activity": "invoke-api",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"expression": {
+											"value": "@contains(if(empty(activity('invoke-api').output.ADFWebActivityResponseHeaders), '', activity('invoke-api').output.ADFWebActivityResponseHeaders), 'next')",
+											"type": "Expression"
+										},
+										"ifFalseActivities": [
+											{
+												"name": "set-done",
+												"type": "SetVariable",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"variableName": "currentUrl",
+													"value": {
+														"value": "@string('')",
+														"type": "Expression"
+													}
+												}
+											}
+										],
+										"ifTrueActivities": [
+											{
+												"name": "set-current-url",
+												"type": "SetVariable",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"variableName": "currentUrl",
+													"value": {
+														"value": "@concat('https://', split(split(split(split(activity('invoke-api').output.ADFWebActivityResponseHeaders.Link, 'next')[0], 'current')[1], 'https://')[1], '>;')[0])",
+														"type": "Expression"
+													}
+												}
+											}
+										]
+									}
+								},
+								{
+									"name": "set-done-api-error",
+									"type": "SetVariable",
+									"dependsOn": [
+										{
+											"activity": "invoke-api",
+											"dependencyConditions": [
+												"Failed"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "currentUrl",
+										"value": {
+											"value": "@string('')",
+											"type": "Expression"
+										}
+									}
+								},
+								{
+									"name": "set-done-save-error",
+									"type": "SetVariable",
+									"dependsOn": [
+										{
+											"activity": "save-file",
+											"dependencyConditions": [
+												"Failed"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "currentUrl",
+										"value": {
+											"value": "@string('')",
+											"type": "Expression"
+										}
+									}
+								},
+								{
+									"name": "set-done-next-error",
+									"type": "SetVariable",
+									"dependsOn": [
+										{
+											"activity": "if-next-link",
+											"dependencyConditions": [
+												"Failed"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "currentUrl",
+										"value": {
+											"value": "@string('')",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"timeout": "7.00:00:00"
+						}
+					},
+					{
+						"name": "set-root-folder",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "rootFolder",
+							"value": {
+								"value": "@replace(replace(replace(replace(replace(replace(\npipeline().parameters.task.RawPath\n,'$yyyy$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'yyyy'))\n,'$MM$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'MM'))\n,'$dd$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'dd'))\n,'$HH$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'HH'))\n,'$mm$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'mm'))\n,'$guid$.json', '')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "task-raw-path",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "set-root-folder",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "log-status-update",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"ID": {
+									"value": "@pipeline().parameters.task.ID",
+									"type": "Expression"
+								},
+								"Property": "RawPath",
+								"Value": {
+									"value": "@variables('rootFolder')",
+									"type": "Expression"
+								}
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"task": {
+						"type": "object"
+					}
+				},
+				"variables": {
+					"currentUrl": {
+						"type": "String"
+					},
+					"rootFolder": {
+						"type": "String"
+					},
+					"apiResponeseProperty": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/SourceHandler/Canvas"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/canvas-load')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "get-token",
+						"type": "WebActivity",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": true,
+							"secureInput": true
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"url": {
+								"value": "https://@{pipeline().globalParameters.keyVaultName}.vault.azure.net/secrets/Canvas-API-Key?api-version=7.0",
+								"type": "Expression"
+							},
+							"method": "GET",
+							"headers": {},
+							"linkedServices": [
+								{
+									"referenceName": "AzureKeyVault",
+									"type": "LinkedServiceReference"
+								}
+							],
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://vault.azure.net"
+							}
+						}
+					},
+					{
+						"name": "get-domain",
+						"type": "WebActivity",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"url": {
+								"value": "https://@{pipeline().globalParameters.keyVaultName}.vault.azure.net/secrets/Canvas-Domain?api-version=7.0",
+								"type": "Expression"
+							},
+							"method": "GET",
+							"headers": {},
+							"linkedServices": [
+								{
+									"referenceName": "AzureKeyVault",
+									"type": "LinkedServiceReference"
+								}
+							],
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://vault.azure.net"
+							}
+						}
+					},
+					{
+						"name": "set-url",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "get-domain",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "currentUrl",
+							"value": {
+								"value": "@concat(replace(\npipeline().parameters.task.SourceQuery\n, '{canvas-domain}', activity('get-domain').output.value)\n, '?per_page=100')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "while-next-link",
+						"type": "Until",
+						"dependsOn": [
+							{
+								"activity": "get-token",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "set-url",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "set-root-folder",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "set-api-response-property",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@equals(length(variables('currentUrl')), 0)",
+								"type": "Expression"
+							},
+							"activities": [
+								{
+									"name": "invoke-api",
+									"type": "WebActivity",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 2,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"url": {
+											"value": "@variables('currentUrl')",
+											"type": "Expression"
+										},
+										"method": "GET",
+										"headers": {
+											"Authorization": {
+												"value": "Bearer @{activity('get-token').output.value}",
+												"type": "Expression"
+											}
+										}
+									}
+								},
+								{
+									"name": "save-file",
+									"type": "WebActivity",
+									"dependsOn": [
+										{
+											"activity": "invoke-api",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"url": {
+											"value": "@replace(replace(replace(\n'https://$STORAGE$.blob.core.windows.net$ROOT$/$guid$.json?resource=filesystem'\n,'$STORAGE$', pipeline().globalParameters.storageName)\n,'$ROOT$', variables('rootFolder'))\n,'$guid$', guid())",
+											"type": "Expression"
+										},
+										"method": "PUT",
+										"headers": {
+											"x-ms-version": "2017-11-09",
+											"x-ms-blob-type": "BlockBlob"
+										},
+										"body": {
+											"value": "@{activity('invoke-api').output[variables('apiResponeseProperty')]}",
+											"type": "Expression"
+										},
+										"authentication": {
+											"type": "MSI",
+											"resource": "https://storage.azure.com/"
+										}
+									}
+								},
+								{
+									"name": "if-next-link",
+									"type": "IfCondition",
+									"dependsOn": [
+										{
+											"activity": "invoke-api",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"expression": {
+											"value": "@contains(if(empty(activity('invoke-api').output.ADFWebActivityResponseHeaders), '', activity('invoke-api').output.ADFWebActivityResponseHeaders), 'next')",
+											"type": "Expression"
+										},
+										"ifFalseActivities": [
+											{
+												"name": "set-done",
+												"type": "SetVariable",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"variableName": "currentUrl",
+													"value": {
+														"value": "@string('')",
+														"type": "Expression"
+													}
+												}
+											}
+										],
+										"ifTrueActivities": [
+											{
+												"name": "set-current-url",
+												"type": "SetVariable",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"variableName": "currentUrl",
+													"value": {
+														"value": "@concat('https://', split(split(split(split(activity('invoke-api').output.ADFWebActivityResponseHeaders.Link, 'next')[0], 'current')[1], 'https://')[1], '>;')[0])",
+														"type": "Expression"
+													}
+												}
+											}
+										]
+									}
+								},
+								{
+									"name": "set-done-api-error",
+									"type": "SetVariable",
+									"dependsOn": [
+										{
+											"activity": "invoke-api",
+											"dependencyConditions": [
+												"Failed"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "currentUrl",
+										"value": {
+											"value": "@string('')",
+											"type": "Expression"
+										}
+									}
+								},
+								{
+									"name": "set-done-save-error",
+									"type": "SetVariable",
+									"dependsOn": [
+										{
+											"activity": "save-file",
+											"dependencyConditions": [
+												"Failed"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "currentUrl",
+										"value": {
+											"value": "@string('')",
+											"type": "Expression"
+										}
+									}
+								},
+								{
+									"name": "set-done-next-error",
+									"type": "SetVariable",
+									"dependsOn": [
+										{
+											"activity": "if-next-link",
+											"dependencyConditions": [
+												"Failed"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "currentUrl",
+										"value": {
+											"value": "@string('')",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"timeout": "7.00:00:00"
+						}
+					},
+					{
+						"name": "set-root-folder",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "rootFolder",
+							"value": {
+								"value": "@replace(replace(replace(replace(replace(replace(\npipeline().parameters.task.RawPath\n,'$yyyy$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'yyyy'))\n,'$MM$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'MM'))\n,'$dd$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'dd'))\n,'$HH$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'HH'))\n,'$mm$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'mm'))\n,'$guid$.json', '')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "task-raw-path",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "set-root-folder",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "log-status-update",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"ID": {
+									"value": "@pipeline().parameters.task.ID",
+									"type": "Expression"
+								},
+								"Property": "RawPath",
+								"Value": {
+									"value": "@variables('rootFolder')",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "set-api-response-property",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "apiResponeseProperty",
+							"value": {
+								"value": "@json(coalesce(pipeline().parameters.task.ExtendedProperties, '{ \"ApiResponseProperty\": \"Response\" }')).ApiResponseProperty",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"task": {
+						"type": "object"
+					}
+				},
+				"variables": {
+					"currentUrl": {
+						"type": "String"
+					},
+					"rootFolder": {
+						"type": "String"
+					},
+					"apiResponeseProperty": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/SourceHandler/Canvas"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/complispace-load')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "get-token",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "get-client-id",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "get-secret",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"url": "https://auth.go1.com/oauth/token",
+							"method": "POST",
+							"headers": {},
+							"body": {
+								"value": "{\n\"client_id\":\"@{activity('get-client-id').output.value}\"\n,\"client_secret\":\"@{activity('get-secret').output.value}\"\n,\"grant_type\":\"client_credentials\"\n}",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "set-token",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "get-token",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "set-url",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "set-root-folder",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "token",
+							"value": {
+								"value": "@activity('get-token').output.access_token",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "get-count",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "set-token",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"url": {
+								"value": "@{variables('url')}?limit=0",
+								"type": "Expression"
+							},
+							"method": "GET",
+							"headers": {
+								"Authorization": {
+									"value": "Bearer @{variables('token')}",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "while-next-offset",
+						"type": "Until",
+						"dependsOn": [
+							{
+								"activity": "set-total",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@greaterOrEquals(int(variables('counter')), int(variables('total')))",
+								"type": "Expression"
+							},
+							"activities": [
+								{
+									"name": "copy-data",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "RestSource",
+											"httpRequestTimeout": "00:01:40",
+											"requestInterval": "00.00:00:00.010",
+											"requestMethod": "GET",
+											"additionalHeaders": {
+												"Authorization": {
+													"value": "Bearer @{variables('token')}",
+													"type": "Expression"
+												}
+											},
+											"paginationRules": {
+												"supportRFC5988": "true"
+											}
+										},
+										"sink": {
+											"type": "JsonSink",
+											"storeSettings": {
+												"type": "AzureBlobFSWriteSettings"
+											},
+											"formatSettings": {
+												"type": "JsonWriteSettings"
+											}
+										},
+										"enableStaging": false
+									},
+									"inputs": [
+										{
+											"referenceName": "REST_Binary",
+											"type": "DatasetReference",
+											"parameters": {
+												"url": {
+													"value": "@{variables('url')}?limit=@{variables('offset-size')}&offset=@{variables('counter')}",
+													"type": "Expression"
+												}
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "DLS_Json",
+											"type": "DatasetReference",
+											"parameters": {
+												"filePath": {
+													"value": "@replace(replace(\n'$ROOT$/$guid$.json'\n,'$ROOT$', variables('rootFolder'))\n,'$guid$', guid())",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								},
+								{
+									"name": "set-counter",
+									"type": "SetVariable",
+									"dependsOn": [
+										{
+											"activity": "set-last",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "counter",
+										"value": {
+											"value": "@{add(int(variables('last')), int(variables('offset-size')))}",
+											"type": "Expression"
+										}
+									}
+								},
+								{
+									"name": "set-last",
+									"type": "SetVariable",
+									"dependsOn": [
+										{
+											"activity": "copy-data",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "last",
+										"value": {
+											"value": "@variables('counter')",
+											"type": "Expression"
+										}
+									}
+								},
+								{
+									"name": "break-counter",
+									"type": "SetVariable",
+									"dependsOn": [
+										{
+											"activity": "copy-data",
+											"dependencyConditions": [
+												"Failed"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "counter",
+										"value": "999999999"
+									}
+								}
+							],
+							"timeout": "7.00:00:00"
+						}
+					},
+					{
+						"name": "set-total",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "get-count",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "total",
+							"value": {
+								"value": "@{activity('get-count').output.total}",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "get-client-id",
+						"type": "WebActivity",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": true,
+							"secureInput": true
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"url": {
+								"value": "https://@{pipeline().globalParameters.keyVaultName}.vault.azure.net/secrets/CompliSpace-ClientID?api-version=7.0",
+								"type": "Expression"
+							},
+							"method": "GET",
+							"headers": {},
+							"linkedServices": [
+								{
+									"referenceName": "AzureKeyVault",
+									"type": "LinkedServiceReference"
+								}
+							],
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://vault.azure.net"
+							}
+						}
+					},
+					{
+						"name": "get-secret",
+						"type": "WebActivity",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": true,
+							"secureInput": true
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"url": {
+								"value": "https://@{pipeline().globalParameters.keyVaultName}.vault.azure.net/secrets/CompliSpace-Secret?api-version=7.0",
+								"type": "Expression"
+							},
+							"method": "GET",
+							"headers": {},
+							"linkedServices": [
+								{
+									"referenceName": "AzureKeyVault",
+									"type": "LinkedServiceReference"
+								}
+							],
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://vault.azure.net"
+							}
+						}
+					},
+					{
+						"name": "set-url",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "url",
+							"value": {
+								"value": "@pipeline().parameters.task.SourceQuery",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "set-root-folder",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "rootFolder",
+							"value": {
+								"value": "@replace(replace(replace(replace(replace(replace(\npipeline().parameters.task.RawPath\n,'$yyyy$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'yyyy'))\n,'$MM$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'MM'))\n,'$dd$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'dd'))\n,'$HH$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'HH'))\n,'$mm$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'mm'))\n,'$guid$.json', '')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "task-raw-path",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "set-root-folder",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "log-status-update",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"ID": {
+									"value": "@pipeline().parameters.task.ID",
+									"type": "Expression"
+								},
+								"Property": "RawPath",
+								"Value": {
+									"value": "@variables('rootFolder')",
+									"type": "Expression"
+								}
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"task": {
+						"type": "object"
+					}
+				},
+				"variables": {
+					"token": {
+						"type": "String"
+					},
+					"total": {
+						"type": "String"
+					},
+					"counter": {
+						"type": "String",
+						"defaultValue": "0"
+					},
+					"last": {
+						"type": "String",
+						"defaultValue": "0"
+					},
+					"offset-size": {
+						"type": "String",
+						"defaultValue": "50"
+					},
+					"url": {
+						"type": "String"
+					},
+					"rootFolder": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/SourceHandler/CompliSpace"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DLS_Json')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/create-table-from-metadata')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "generate-create-table",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": {
+									"value": "SELECT \nCONCAT([CreateSchema], [CreateTableSQL]) [CreateTableSQL]\nFROM [dbo].[MetadataGenerated] S\nJOIN [dbo].[ExtractLoadManifest] R ON R.SourceSchema = S.TableSchema AND R.SourceTableName = S.TableName\nWHERE [SourceSchema]='@{pipeline().parameters.SchemaName}' AND [SourceTableName]='@{pipeline().parameters.TableName}'",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "SQL_ControlDB",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"firstRowOnly": false
+						}
+					},
+					{
+						"name": "create-table-on-target",
+						"type": "Lookup",
+						"dependsOn": [
+							{
+								"activity": "generate-create-table",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "SqlServerSource",
+								"sqlReaderQuery": {
+									"value": "@{activity('generate-create-table').output.value[0].CreateSchema} @{activity('generate-create-table').output.value[0].CreateTableSQL} SELECT 1 A\n\n\n",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "SQL_Server",
+								"type": "DatasetReference",
+								"parameters": {
+									"kvSecret": {
+										"value": "@pipeline().parameters.targetKeyVaultKey",
+										"type": "Expression"
+									}
+								}
+							},
+							"firstRowOnly": false
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"SchemaName": {
+						"type": "string"
+					},
+					"TableName": {
+						"type": "string"
+					},
+					"sourceKeyVaultKey": {
+						"type": "string"
+					},
+					"targetKeyVaultKey": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/Setup/Metadata"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/SQL_ControlDB')]",
+				"[concat(variables('factoryId'), '/datasets/SQL_Server')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/csv-load')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "set-filename",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "OutputFileName",
+							"value": {
+								"value": "@guid()",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "set-path",
+						"description": "",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "OutputPath",
+							"value": {
+								"value": "@pipeline().parameters.TaskDetails.RawPath",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "set-full-path",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "set-filename",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "set-path",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "OutputFullPath",
+							"value": {
+								"value": "@replace(replace(replace(replace(replace(\nconcat(variables('OutputPath'), if(endswith(variables('OutputPath'), '/'), '', '/'), variables('OutputFileName'), '.parquet')\n,'$yyyy$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'yyyy'))\n,'$MM$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'MM'))\n,'$dd$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'dd'))\n,'$HH$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'HH'))\n,'$mm$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'mm'))\n",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Input-Folderpath",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "InputFolderPath",
+							"value": {
+								"value": "@pipeline().parameters.TaskDetails.SourceFolderPath",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Input-Filepath",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "InputFilePath",
+							"value": {
+								"value": "@pipeline().parameters.TaskDetails.SourceFileName",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set-full-inputpath",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Input-Folderpath",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "Input-Filepath",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "InputFullPath",
+							"value": {
+								"value": "@concat(variables('InputFolderPath'),'/',variables('InputFilePath'))",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "copy-CSV",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "set-full-path",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "Set-full-inputpath",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [
+							{
+								"name": "Destination",
+								"value": "raw/Cewa Financials/"
+							}
+						],
+						"typeProperties": {
+							"source": {
+								"type": "DelimitedTextSource",
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "DelimitedTextReadSettings"
+								}
+							},
+							"sink": {
+								"type": "ParquetSink",
+								"storeSettings": {
+									"type": "AzureBlobFSWriteSettings"
+								},
+								"formatSettings": {
+									"type": "ParquetWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DLS_Csv",
+								"type": "DatasetReference",
+								"parameters": {
+									"filePath": {
+										"value": "@variables('InputFullPath')",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DLS_Parquet",
+								"type": "DatasetReference",
+								"parameters": {
+									"BlobPath": {
+										"value": "@variables('OutputFullPath')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "task-raw-path",
+						"type": "SqlServerStoredProcedure",
+						"dependsOn": [
+							{
+								"activity": "copy-CSV",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"storedProcedureName": "[[dbo].[BatchUpdate]",
+							"storedProcedureParameters": {
+								"BatchID": {
+									"value": {
+										"value": "@pipeline().parameters.TaskDetails.BatchID",
+										"type": "Expression"
+									},
+									"type": "String"
+								},
+								"SourceID": {
+									"value": {
+										"value": "@pipeline().parameters.TaskDetails.SourceID",
+										"type": "Expression"
+									},
+									"type": "Int32"
+								},
+								"Property": {
+									"value": "RawPath",
+									"type": "String"
+								},
+								"Value": {
+									"value": {
+										"value": "@variables('OutputFullPath')",
+										"type": "Expression"
+									},
+									"type": "String"
+								}
+							}
+						},
+						"linkedServiceName": {
+							"referenceName": "AzureSqlDatabase_Ctrldb",
+							"type": "LinkedServiceReference"
+						}
+					},
+					{
+						"name": "log-copy",
+						"type": "SqlServerStoredProcedure",
+						"dependsOn": [
+							{
+								"activity": "copy-CSV",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"storedProcedureName": "[[dbo].[LogMessage]",
+							"storedProcedureParameters": {
+								"BatchStatusID": {
+									"value": {
+										"value": "@pipeline().parameters.TaskDetails.ID",
+										"type": "Expression"
+									},
+									"type": "Int32"
+								},
+								"PipelineRunID": {
+									"value": null,
+									"type": "String"
+								},
+								"ActivityType": {
+									"value": "copy-data",
+									"type": "String"
+								},
+								"Message": {
+									"value": {
+										"value": "@{activity('copy-CSV')}",
+										"type": "Expression"
+									},
+									"type": "String"
+								}
+							}
+						},
+						"linkedServiceName": {
+							"referenceName": "AzureSqlDatabase_Ctrldb",
+							"type": "LinkedServiceReference"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"TaskDetails": {
+						"type": "object"
+					}
+				},
+				"variables": {
+					"OutputFileName": {
+						"type": "String"
+					},
+					"OutputPath": {
+						"type": "String"
+					},
+					"OutputFullPath": {
+						"type": "String"
+					},
+					"InputFolderPath": {
+						"type": "String"
+					},
+					"InputFilePath": {
+						"type": "String"
+					},
+					"InputFullPath": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/SourceHandler/DLS"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DLS_Parquet')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/excel-load')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "set-filename",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "OutputFileName",
+							"value": {
+								"value": "@guid()",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "set-path",
+						"description": "",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "OutputPath",
+							"value": {
+								"value": "@pipeline().parameters.TaskDetails.RawPath",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "set-full-path",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "set-path",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "set-filename",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "OutputFullPath",
+							"value": {
+								"value": "@replace(replace(replace(replace(replace(\nconcat(variables('OutputPath'), if(endswith(variables('OutputPath'), '/'), '', '/'), variables('OutputFileName'), '.parquet')\n,'$yyyy$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'yyyy'))\n,'$MM$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'MM'))\n,'$dd$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'dd'))\n,'$HH$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'HH'))\n,'$mm$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'mm'))\n",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Input-Folderpath",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "InputFolderPath",
+							"value": {
+								"value": "@pipeline().parameters.TaskDetails.SourceFolderPath",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Input-Filepath",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "InputFilePath",
+							"value": {
+								"value": "@pipeline().parameters.TaskDetails.SourceFileName",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set-full-inputpath",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Input-Folderpath",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "Input-Filepath",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "InputFullPath",
+							"value": {
+								"value": "@concat(variables('InputFolderPath'),'/',variables('InputFilePath'))",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "copy-Excel",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "set-full-path",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "Set-full-inputpath",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "get-index",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [
+							{
+								"name": "Destination",
+								"value": "raw/Cewa Financials/"
+							}
+						],
+						"typeProperties": {
+							"source": {
+								"type": "ExcelSource",
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								}
+							},
+							"sink": {
+								"type": "ParquetSink",
+								"storeSettings": {
+									"type": "AzureBlobFSWriteSettings"
+								},
+								"formatSettings": {
+									"type": "ParquetWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DLS_Excel_index",
+								"type": "DatasetReference",
+								"parameters": {
+									"filePath": {
+										"value": "@variables('InputFullPath')",
+										"type": "Expression"
+									},
+									"sheetIndex": {
+										"value": "@variables('Index')",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DLS_Parquet",
+								"type": "DatasetReference",
+								"parameters": {
+									"BlobPath": {
+										"value": "@variables('OutputFullPath')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "task-raw-path",
+						"type": "SqlServerStoredProcedure",
+						"dependsOn": [
+							{
+								"activity": "copy-Excel",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"storedProcedureName": "[[dbo].[BatchUpdate]",
+							"storedProcedureParameters": {
+								"BatchID": {
+									"value": {
+										"value": "@pipeline().parameters.TaskDetails.BatchID",
+										"type": "Expression"
+									},
+									"type": "String"
+								},
+								"SourceID": {
+									"value": {
+										"value": "@pipeline().parameters.TaskDetails.SourceID",
+										"type": "Expression"
+									},
+									"type": "Int32"
+								},
+								"Property": {
+									"value": "RawPath",
+									"type": "String"
+								},
+								"Value": {
+									"value": {
+										"value": "@variables('OutputFullPath')",
+										"type": "Expression"
+									},
+									"type": "String"
+								}
+							}
+						},
+						"linkedServiceName": {
+							"referenceName": "AzureSqlDatabase_Ctrldb",
+							"type": "LinkedServiceReference"
+						}
+					},
+					{
+						"name": "log-copy",
+						"type": "SqlServerStoredProcedure",
+						"dependsOn": [
+							{
+								"activity": "copy-Excel",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"storedProcedureName": "[[dbo].[LogMessage]",
+							"storedProcedureParameters": {
+								"BatchStatusID": {
+									"value": {
+										"value": "@pipeline().parameters.TaskDetails.ID",
+										"type": "Expression"
+									},
+									"type": "Int32"
+								},
+								"PipelineRunID": {
+									"value": null,
+									"type": "String"
+								},
+								"ActivityType": {
+									"value": "copy-data",
+									"type": "String"
+								},
+								"Message": {
+									"value": {
+										"value": "@{activity('copy-Excel')}",
+										"type": "Expression"
+									},
+									"type": "String"
+								}
+							}
+						},
+						"linkedServiceName": {
+							"referenceName": "AzureSqlDatabase_Ctrldb",
+							"type": "LinkedServiceReference"
+						}
+					},
+					{
+						"name": "get-index",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "Index",
+							"value": {
+								"value": "@string(json(pipeline().parameters.TaskDetails.ExtendedProperties).SheetIndex)",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"TaskDetails": {
+						"type": "object"
+					}
+				},
+				"variables": {
+					"OutputFileName": {
+						"type": "String"
+					},
+					"OutputPath": {
+						"type": "String"
+					},
+					"OutputFullPath": {
+						"type": "String"
+					},
+					"InputFolderPath": {
+						"type": "String"
+					},
+					"InputFilePath": {
+						"type": "String"
+					},
+					"InputFullPath": {
+						"type": "String"
+					},
+					"Index": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/SourceHandler/DLS"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DLS_Parquet')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/file-binary-load')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "copy-file-binary",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "set-output-full-path",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "set-source-file-path",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [
+							{
+								"name": "Destination",
+								"value": "raw/Cewa Financials/"
+							}
+						],
+						"typeProperties": {
+							"source": {
+								"type": "BinarySource",
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true
+								},
+								"formatSettings": {
+									"type": "BinaryReadSettings"
+								}
+							},
+							"sink": {
+								"type": "BinarySink",
+								"storeSettings": {
+									"type": "AzureBlobFSWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DLS_Binary",
+								"type": "DatasetReference",
+								"parameters": {
+									"filePath": {
+										"value": "@variables('SourceFilePath')",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DLS_Binary",
+								"type": "DatasetReference",
+								"parameters": {
+									"filePath": {
+										"value": "@variables('OutputFullPath')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "set-source-file-path",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "SourceFilePath",
+							"value": {
+								"value": "@pipeline().parameters.task.SourceQuery",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "set-output-full-path",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "OutputFullPath",
+							"value": {
+								"value": "@replace(replace(replace(replace(replace(replace(\npipeline().parameters.task.RawPath\n,'$yyyy$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'yyyy'))\n,'$MM$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'MM'))\n,'$dd$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'dd'))\n,'$HH$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'HH'))\n,'$mm$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'mm'))\n,'$guid$', guid())",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "task-raw-path",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "copy-file-binary",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "log-status-update",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"ID": {
+									"value": "@pipeline().parameters.task.ID",
+									"type": "Expression"
+								},
+								"Property": "RawPath",
+								"Value": {
+									"value": "@variables('OutputFullPath')",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "log-copy",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "copy-file-binary",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "log-message",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"ID": {
+									"value": "@pipeline().parameters.task.ID",
+									"type": "Expression"
+								},
+								"ActivityType": "copy-data",
+								"Message": {
+									"value": "@{activity('copy-file-binary')}",
+									"type": "Expression"
+								}
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"task": {
+						"type": "object"
+					}
+				},
+				"variables": {
+					"OutputFullPath": {
+						"type": "String"
+					},
+					"SourceFilePath": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/SourceHandler/DLS"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/http-binary-load')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "set-full-path",
+						"description": "",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "OutputFullPath",
+							"value": {
+								"value": "@replace(replace(replace(replace(replace(replace(\npipeline().parameters.TaskDetails.RawPath\n,'$yyyy$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'yyyy'))\n,'$MM$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'MM'))\n,'$dd$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'dd'))\n,'$HH$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'HH'))\n,'$mm$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'mm'))\n,'$guid$', guid())",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "set-url",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "Url",
+							"value": {
+								"value": "@pipeline().parameters.TaskDetails.SourceQuery",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "copy-http-binary",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "set-full-path",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "set-url",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [
+							{
+								"name": "Destination",
+								"value": "raw/Cewa Financials/"
+							}
+						],
+						"typeProperties": {
+							"source": {
+								"type": "BinarySource",
+								"storeSettings": {
+									"type": "HttpReadSettings",
+									"requestMethod": "GET"
+								},
+								"formatSettings": {
+									"type": "BinaryReadSettings"
+								}
+							},
+							"sink": {
+								"type": "BinarySink",
+								"storeSettings": {
+									"type": "AzureBlobFSWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "HTTP_Binary",
+								"type": "DatasetReference",
+								"parameters": {
+									"httpUrl": {
+										"value": "@variables('Url')",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DLS_Binary",
+								"type": "DatasetReference",
+								"parameters": {
+									"filePath": {
+										"value": "@variables('OutputFullPath')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "log-status",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "copy-http-binary",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "log-status-update",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"BatchID": {
+									"value": "@pipeline().parameters.TaskDetails.BatchID",
+									"type": "Expression"
+								},
+								"SourceID": {
+									"value": "@pipeline().parameters.TaskDetails.SourceID",
+									"type": "Expression"
+								},
+								"Property": "RawPath",
+								"Value": {
+									"value": "@variables('OutputFullPath')",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "log-copy",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "copy-http-binary",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "log-message",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"BatchStatusID": {
+									"value": "@pipeline().parameters.TaskDetails.ID",
+									"type": "Expression"
+								},
+								"ActivityType": "copy-data",
+								"Message": {
+									"value": "@{activity('copy-http-binary')}",
+									"type": "Expression"
+								}
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"TaskDetails": {
+						"type": "object"
+					}
+				},
+				"variables": {
+					"OutputFullPath": {
+						"type": "String"
+					},
+					"Url": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/SourceHandler"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/import-ingestion-csv')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "for-each-ingestion",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "import-file",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@take(activity('import-file').output.value, if(equals(int(activity('get-config').output.firstRow.Limit), 0), 999, int(activity('get-config').output.firstRow.Limit)))",
+								"type": "Expression"
+							},
+							"isSequential": true,
+							"activities": [
+								{
+									"name": "add-ingestion",
+									"type": "SqlServerStoredProcedure",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"storedProcedureName": "[[dbo].[AddIngestion]",
+										"storedProcedureParameters": {
+											"SystemCode": {
+												"value": {
+													"value": "@item().SystemCode",
+													"type": "Expression"
+												},
+												"type": "String"
+											},
+											"Schema": {
+												"value": {
+													"value": "@item().TableSchema",
+													"type": "Expression"
+												},
+												"type": "String"
+											},
+											"Table": {
+												"value": {
+													"value": "@item().TableName",
+													"type": "Expression"
+												},
+												"type": "String"
+											},
+											"Query": {
+												"value": {
+													"value": "@item().SourceQuery",
+													"type": "Expression"
+												},
+												"type": "String"
+											},
+											"WatermarkColumn": {
+												"value": {
+													"value": "@item().WatermarkColumn",
+													"type": "Expression"
+												},
+												"type": "String"
+											},
+											"SourceHandler": {
+												"value": {
+													"value": "@item().SourceHandler",
+													"type": "Expression"
+												},
+												"type": "String"
+											},
+											"RawFileExtension": {
+												"value": {
+													"value": "@item().RawFileExtension",
+													"type": "Expression"
+												},
+												"type": "String"
+											},
+											"KeyVaultSecret": {
+												"value": {
+													"value": "@item().KeyVaultSecret",
+													"type": "Expression"
+												},
+												"type": "String"
+											},
+											"ExtendedProperties": {
+												"value": {
+													"value": "@item().ExtendedProperties",
+													"type": "Expression"
+												},
+												"type": "String"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "AzureSqlDatabase_Ctrldb",
+										"type": "LinkedServiceReference"
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "import-file",
+						"type": "Lookup",
+						"dependsOn": [
+							{
+								"activity": "get-config",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "DelimitedTextSource",
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "DelimitedTextReadSettings"
+								}
+							},
+							"dataset": {
+								"referenceName": "DLS_Csv",
+								"type": "DatasetReference",
+								"parameters": {
+									"filePath": "@activity('get-config').output.firstRow.Path"
+								}
+							},
+							"firstRowOnly": false
+						}
+					},
+					{
+						"name": "get-config",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": "SELECT [Path], [Index], [Limit] FROM   \n( \n\tSELECT * FROM [dbo].[Config]\n\tWHERE [KeyGroup] = 'IngestionSheet'\n) T\nPIVOT(\n\tMAX([Value]) \n\tFOR [Key] IN (\n\t\t[Index], \n\t\t[Path],\n\t\t[Limit]\n\t)\n) T;",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "SQL_ControlDB",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"folder": {
+					"name": "ELT-Framework/Setup"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/SQL_ControlDB')]"
+			]
+		}
+	]
+}

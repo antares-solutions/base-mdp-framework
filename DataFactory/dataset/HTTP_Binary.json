@@ -1,0 +1,30 @@
+{
+	"name": "HTTP_Binary",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "HttpLinkAnonymous",
+			"type": "LinkedServiceReference",
+			"parameters": {
+				"url": {
+					"value": "@dataset().httpUrl",
+					"type": "Expression"
+				}
+			}
+		},
+		"parameters": {
+			"httpUrl": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "ELT-Framework/HTTP"
+		},
+		"annotations": [],
+		"type": "Binary",
+		"typeProperties": {
+			"location": {
+				"type": "HttpServerLocation"
+			}
+		}
+	}
+}

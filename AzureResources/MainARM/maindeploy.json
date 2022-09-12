@@ -1,0 +1,140 @@
+﻿{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+
+  "parameters": {
+    "ServicePrincipal-ObjectID": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Service Principal Object ID"
+      }
+    },
+    "ServicePrincipal-ApplicationID": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Service Principal Application/Client ID"
+      }
+    },
+    "ServicePrincipal-Secret": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Service Principal Secret"
+      }
+    },
+    "resource-template": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Resource Template"
+      }
+    },
+    "environment": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Environment"
+      }
+    },
+    "database-User": {
+      "type": "string",
+      "metadata": {
+        "description": "Database Username"
+      }
+    },
+    "database-Password": {
+      "type": "string",
+      "metadata": {
+        "description": "Database Password"
+      }
+    }
+  },
+
+  "variables": {
+    "use-synapse": "[bool('false')]"
+  },
+
+  "functions": [
+    {
+      "namespace": "arm",
+      "members": {
+        "uniqueName": {
+          "parameters": [
+            {
+              "name": "resource",
+              "type": "string"
+            },
+            {
+              "name": "resource-template",
+              "type": "string"
+            },
+            {
+              "name": "environment",
+              "type": "string"
+            }
+          ],
+          "output": {
+            "type": "string",
+            "value": "[replace( replace(replace(parameters('resource-template'), '$RES$', parameters('resource')), '$ENV$', parameters('environment')) , '-', if(contains(createArray('sta', 'dls', 'crg'), parameters('resource')), '', '-'))]"
+          }
+        }
+      }
+    }
+  ],
+
+  "resources": [
+  ],
+
+  "outputs": {
+    "ServicePrincipal-ObjectID": {
+      "type": "string",
+      "value": "[parameters('ServicePrincipal-ObjectID')]"
+    },
+    "ServicePrincipal-ApplicationID": {
+      "type": "string",
+      "value": "[parameters('ServicePrincipal-ApplicationID')]"
+    },
+    "ServicePrincipal-Secret": {
+      "type": "string",
+      "value": "[parameters('ServicePrincipal-Secret')]"
+    },
+    "dbUsername": {
+      "type": "string",
+      "value": "[parameters('database-User')]"
+    },
+    "dbPassword": {
+      "type": "string",
+      "value": "[parameters('database-Password')]"
+    },
+    "AzureSqlServerName": {
+      "type": "string",
+      "value": "[arm.uniqueName('sql', parameters('resource-template'), parameters('environment'))]"
+    },
+    "dataLakeName": {
+      "type": "string",
+      "value": "[arm.uniqueName('dls', parameters('resource-template'), parameters('environment'))]"
+    },
+    "dataFactoryName": {
+      "type": "string",
+      "value": "[replace(arm.uniqueName('adf', parameters('resource-template'), parameters('environment')), 'v41', 'v42')]"
+    },
+    "SHIRName": {
+      "type": "string",
+      "value": ""
+    },
+    "keyVaultName": {
+      "type": "string",
+      "value": "[arm.uniqueName('akv', parameters('resource-template'), parameters('environment'))]"
+    },
+    "databricksWorkspaceName": {
+      "type": "string",
+      "value": "[arm.uniqueName('adb', parameters('resource-template'), parameters('environment'))]"
+    },
+    "synapseWorkspaceName": {
+      "type": "string",
+      "value": "[if(variables('use-synapse'), arm.uniqueName('syn', parameters('resource-template'), parameters('environment')), '')]"
+    }
+  }
+}

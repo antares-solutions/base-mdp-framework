@@ -1,0 +1,28 @@
+{
+	"name": "DLS_Folder",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "AzureDataLakeStorage",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"folderPath": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "ELT-Framework/DLS"
+		},
+		"annotations": [],
+		"type": "Binary",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"fileSystem": {
+					"value": "@dataset().folderPath",
+					"type": "Expression"
+				}
+			}
+		}
+	}
+}

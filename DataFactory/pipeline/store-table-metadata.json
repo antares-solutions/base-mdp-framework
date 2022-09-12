@@ -1,0 +1,93 @@
+{
+	"name": "store-table-metadata",
+	"properties": {
+		"activities": [
+			{
+				"name": "fetch-source-metadata",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "SqlServerSource",
+						"sqlReaderQuery": {
+							"value": "SELECT TABLE_SCHEMA,TABLE_NAME,COLUMN_NAME,ORDINAL_POSITION,IS_NULLABLE,DATA_TYPE,CHARACTER_MAXIMUM_LENGTH,NUMERIC_PRECISION,NUMERIC_SCALE FROM information_schema.columns (NOLOCK) WHERE TABLE_NAME = '@{pipeline().parameters.TableName}' and TABLE_SCHEMA = '@{pipeline().parameters.SchemaName}'",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "SQL_Server",
+						"type": "DatasetReference",
+						"parameters": {
+							"kvSecret": {
+								"value": "@pipeline().parameters.sourceKeyVaultKey",
+								"type": "Expression"
+							}
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "store-metadata",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "fetch-source-metadata",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "UPDATE [dbo].[ExtractLoadManifest] SET [SourceMetaData]= '@{activity('fetch-source-metadata').output.value}' WHERE  [SourceTableName] = '@{pipeline().parameters.TableName}'  \nAND [SourceSchema] = '@{pipeline().parameters.SchemaName}' SELECT 1 A",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "SQL_ControlDB",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			}
+		],
+		"parameters": {
+			"SchemaName": {
+				"type": "string"
+			},
+			"TableName": {
+				"type": "string"
+			},
+			"sourceKeyVaultKey": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "ELT-Framework/Setup/Metadata"
+		},
+		"annotations": []
+	}
+}
