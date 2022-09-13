@@ -54,7 +54,7 @@ Once the Azure resources are created, there are two post requisite tasks to be c
 
 1. [Creating a Secret-Scope in Databricks](./Documentations/Create%20a%20Secret-Scope%20in%20Databricks.md).
 2. [Add Storage Blob Data Contributor RBAC role to resource group](./Documentations/Add%20Storage%20Blob%20Data%20Contributor%20RBAC%20role%20to%20Resource%20Group.md).
-3. [Configure Git Configuration & Add Global Parameters in Azure Data Factory](./Documentations/Configure%20Git%20Configuration%20%26%20Add%20Global%20Parameters%20in%20Azure%20Data%20Factory.md)
+3. [Configure Git Configuration & Add Global Parameters in Azure Data Factory](./Documentations/Configure%20Git%20Configuration%20%26%20Add%20Global%20Parameters%20in%20Azure%20Data%20Factory.md).
 4. [Link Azure DevOps repo to Databricks](./Documentations/Link%20Azure%20DevOps%20repo%20to%20Databricks.md).
 5. [Create database per container in Databricks](./Documentations/Create%20database%20per%20container%20in%20Databricks.md).
 6. [Adding data source entry and generated for data ingestion from SQL data source](./Documentations/Adding%20data%20source%20entry%20and%20generated%20for%20data%20ingestion%20from%20sql%20data%20source.md).
@@ -67,4 +67,4 @@ To get data into the data lake:
 
 1. [Execute the main pipeline](./Documentations/Execute%20the%20main%20pipeline.md).  
 2. [Creating notebooks and ADF for Curated Pipeline](./Documentations/Creating%20notebooks%20and%20ADF%20for%20Curated%20Pipeline.md).
-3. [Enabling the Curated Pipeline for Curated Pipeline for Execution in ADF](./Documentations/Enabling%20the%20Curated%20Pipeline%20for%20Curated%20Pipeline%20for%20Execution%20in%20ADF.md)
+3. [Enabling the Curated Pipeline for Curated Pipeline for Execution in ADF](./Documentations/Enabling%20the%20Curated%20Pipeline%20for%20Curated%20Pipeline%20for%20Execution%20in%20ADF.md).
