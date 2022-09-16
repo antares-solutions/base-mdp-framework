@@ -4,31 +4,31 @@
 
   "parameters": {
     "ServicePrincipal-ObjectID": {
-      "type": "string",
+      "type": "securestring",
       "metadata": {
         "description": "SP Object ID"
       }
     },
     "ServicePrincipal-ApplicationID": {
-      "type": "string",
+      "type": "securestring",
       "metadata": {
         "description": "SP AppID"
       }
     },
     "ServicePrincipal-Secret": {
-      "type": "string",
+      "type": "securestring",
       "metadata": {
         "description": "SP App Secret"
       }
     },
     "AAD-Group-ObjectID": {
-      "type": "string",
+      "type": "securestring",
       "metadata": {
         "description": "Group Object ID"
       }
     },
     "AzureDatabricks-ObjectID": {
-      "type": "string",
+      "type": "securestring",
       "metadata": {
         "description": "AzureDatabricks Object ID"
       }
@@ -40,13 +40,13 @@
       }
     },
     "dbUsername": {
-      "type": "string",
+      "type": "securestring",
       "metadata": {
         "description": "Database Username"
       }
     },
     "dbPassword": {
-      "type": "string",
+      "type": "securestring",
       "metadata": {
         "description": "Database Password"
       }
@@ -206,7 +206,7 @@
             "objectId": "[reference(concat('Microsoft.DataFactory/factories/', parameters('dataFactoryName')), '2018-06-01', 'Full').identity.principalId]",
             "tenantId": "[variables('tenantId')]",
             "permissions": {
-              "secrets": [ "get" ]
+              "secrets": [ "get", "list" ]
             }
           }
         ],

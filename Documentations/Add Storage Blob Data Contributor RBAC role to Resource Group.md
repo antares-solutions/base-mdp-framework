@@ -25,5 +25,3 @@ Once the app registration, app secret and enterprise application settings have b
 
 8. Once the *Review + Assign* page loads, click on the **Review + assign** button.  
    ![Azure - Access Control Add role assignment review and assign](./images/Azure%20-%20Access%20Control%20Add%20role%20assignment%20review%20and%20assign.png)
-
-9. Once the addition of the role assignment is completed, repeat steps from 3 to 8 for UAT and PROD.

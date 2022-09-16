@@ -4,7 +4,7 @@
 
   "parameters": {
     "ServicePrincipal-ObjectID": {
-      "type": "string",
+      "type": "securestring",
       "metadata": {
         "description": "SP Object ID"
       }
@@ -16,13 +16,13 @@
       }
     },
     "dbUsername": {
-      "type": "string",
+      "type": "securestring",
       "metadata": {
         "description": "SQL Server Username"
       }
     },
     "dbPassword": {
-      "type": "string",
+      "type": "securestring",
       "metadata": {
         "description": "SQL Server Password"
       }

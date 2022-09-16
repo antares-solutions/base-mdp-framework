@@ -4,21 +4,21 @@
 
   "parameters": {
     "ServicePrincipal-ObjectID": {
-      "type": "string",
+      "type": "securestring",
       "defaultValue": "",
       "metadata": {
         "description": "Service Principal Object ID"
       }
     },
     "ServicePrincipal-ApplicationID": {
-      "type": "string",
+      "type": "securestring",
       "defaultValue": "",
       "metadata": {
         "description": "Service Principal Application/Client ID"
       }
     },
     "ServicePrincipal-Secret": {
-      "type": "string",
+      "type": "securestring",
       "defaultValue": "",
       "metadata": {
         "description": "Service Principal Secret"
@@ -39,13 +39,13 @@
       }
     },
     "database-User": {
-      "type": "string",
+      "type": "securestring",
       "metadata": {
         "description": "Database Username"
       }
     },
     "database-Password": {
-      "type": "string",
+      "type": "securestring",
       "metadata": {
         "description": "Database Password"
       }

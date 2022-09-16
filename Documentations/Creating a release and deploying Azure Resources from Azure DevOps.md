@@ -97,8 +97,6 @@ The group variables are required for the MDP Framework, in order to do the deplo
    |resource-Group   |Name of Azure Resource Group|  
    ![Azure DevOps - Pipelines (Variables VG-DEV)](./images/Azure%20DevOps%20-%20Pipelines%20(Variables%20VG-DEV).png)
 
-9. Repeat steps 6 to 8 for UAT and PROD.
-
 Once you have created the Variable groups, this will be utilize when creating a release.
 
 ## Build Release Artifacts
@@ -183,10 +181,7 @@ Once the artifact is added, you will now need to configure the job and task in t
 14. Click on **Control DB** and and select the [Service Principal](./Creating%20Service%20Principal%20For%20Azure%20DevOps.md) in the **Azure Subscription** dropdown.  
    ![Azure DevOps - Pipelines (Fill empty mandatory fields in controldb)](./images/Azure%20DevOps%20-%20Pipelines%20(Fill%20empty%20mandatory%20fields%20in%20controldb).png)
 
-15. Open the **Task** menu, and then select UAT and then PROD. Repeat steps 4 to 14 for UAT and PROD.  
-   ![Azure DevOps - Pipelines (Tasks)](./images/Azure%20DevOps%20-%20Pipelines%20(Tasks).png)
-
-16. Once you have completed entering the variables for UAT and PROD. click on the **Save** button.  
+15. Once you have completed entering the variables DEV. click on the **Save** button.  
    ![Azure DevOps - Pipelines (Save Pipeline Changes)](./images/Azure%20DevOps%20-%20Pipelines%20(Save%20Pipeline%20Changes).png)
 
 ### Linking Group Variables
@@ -212,7 +207,7 @@ Once you have completed entering the pipeline configuration variables. Next is t
 7. Once *VG-SHARED* is linked, click on the **Link variable group** button and link **VG-DEV**, select the **Stages** option from **Variable group scope** section and then from the dropdown menu select **DEV**. Lastly, click on the **Link** button.  
    ![Azure DevOps - Pipelines (Linking vg-dev to pipeline)](./images/Azure%20DevOps%20-%20Pipelines%20(Linking%20vg-dev%20to%20pipeline).png)
 
-8. Repeat step 7 for UAT and DEV and then click the **Save** button and when the **Save** Dialog appears click on the **OK** button.  
+8. Repeat step 7 for DEV and then click the **Save** button and when the **Save** Dialog appears click on the **OK** button.  
    ![Azure DevOps - Pipelines (Save linked variable groups to pipeline)](./images/Azure%20DevOps%20-%20Pipelines%20(Save%20linked%20variable%20groups%20to%20pipeline).png)
 
 ## Create a release
