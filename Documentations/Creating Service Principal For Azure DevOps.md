@@ -16,13 +16,13 @@ Please see below steps for creating a service principal.
 4. Click on the **New Registration** button.  
    ![AAD - App Registration](./images/App%20Registration%20(New%20Registration).PNG)
 
-5. Enter the user-facing display name *sp-mdp-dev-01* and select **Accounts in this organizational directory only (Default Directory only - Single tenant)**. In the Redirect URI section select **Single-page application** and the URL  And then click the register button.  
+5. Enter the user-facing display name *sp-mdp-dev-01* and select **Accounts in this organizational directory only (Default Directory only - Single tenant)**. In the Redirect URI section select **Single-page application** and the URL `https://VisualStudio/SPN/` into the text box; and then click the register button.  
    ![AAD - App Registration (Register An Application)](./images/App%20Registration%20(Register%20An%20Application).PNG)
 
 6. Once the app registration is completed, from the left side menu select **Authentication**.  
    ![ADD - App Registration (Select Authentication)](./images/App%20Registration%20(Select%20Authentication).png)
 
-7. Once the authentication page, is loaded, under the **Implicit grant and hybrid flows**; check the **ID Tokens (used for implicit flows)**. And then click the Save button. 
+7. Once the authentication page, is loaded, under the **Implicit grant and hybrid flows**; check the **ID Tokens (used for implicit flows)**. And then click the Save button.  
    ![ADD - App Registration (ID Tokens)](./images/App%20Registration%20(Check%20ID%20tokens).png)
 
 

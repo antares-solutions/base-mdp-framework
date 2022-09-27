@@ -69,7 +69,7 @@ The group variables are required for the MDP Framework, in order to do the deplo
    |Variable Name                 |Input Value Description                                                                                                                                                  |
    |------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
    |AAD-Group-Name                |AAD Group Name                                                                                                                                                           |
-   |ADD-Group-ObjectID            |Object ID for AAD Group                                                                                                                                                  |
+   |AAD-Group-ObjectID            |Object ID for AAD Group                                                                                                                                                  |
    |AzureDatabricks-ObjectID      |Object ID from [Service Principal for Azure Databricks](./Creating%20Service%20Principal%20For%20DataBricks.md).                                                         |
    |database-User                 |Service Account User Name for `ControlDB`                                                                                                                                |
    |location                      |Location of deployed Azure resource                                                                                                                                      |
@@ -95,6 +95,7 @@ The group variables are required for the MDP Framework, in order to do the deplo
    |database-Password|Password for ControlDB      |
    |environment      |Name of environment         |
    |resource-Group   |Name of Azure Resource Group|  
+   
    ![Azure DevOps - Pipelines (Variables VG-DEV)](./images/Azure%20DevOps%20-%20Pipelines%20(Variables%20VG-DEV).png)
 
 Once you have created the Variable groups, this will be utilize when creating a release.
