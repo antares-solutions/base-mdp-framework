@@ -4,7 +4,7 @@ After setting up databricks and Azure Data Factory, this step involves adding an
 
 ## Adding SQL Data source into Azure Key vault & adding an entry in the control DB
 
-1. Firstly, you will need to added your data source and, database server, database, user name and password into the connection string below.  
+1. Firstly, you will need copy the connection string below and then find and replace the name place holders.  
 
    ```text
      Server=tcp:{servername}.database.windows.net,1433;Database={databasename};User ID={username}@{servername};Password={password};Trusted_Connection=False;Encrypt=True;Connection Timeout=30

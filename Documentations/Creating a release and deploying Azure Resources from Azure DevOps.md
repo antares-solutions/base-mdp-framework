@@ -214,7 +214,7 @@ Once you have completed entering the pipeline configuration variables. Next is t
 ## Create a release
 
 1. Once all the variables linked to the pipeline, click on **Releases** option on the left side menu.  
-   ![Azure DevOps - Pipelines (Releases)](./images/Azure%20DevOps%20-%20Pipelines%20(Releases).png
+   ![Azure DevOps - Pipelines (Releases)](./images/Azure%20DevOps%20-%20Pipelines%20(Releases).png)
 
 2. Once the *Release* page is loaded, click on the **Create a release** or the **Create release** button.  
    ![Azure DevOps - Releases (Create a Release)](./images/Azure%20DevOps%20-%20Releases%20(Create%20a%20Release).png)
