@@ -1,6 +1,7 @@
 {
 	"name": "Main",
 	"properties": {
+		"description": " ",
 		"activities": [
 			{
 				"name": "get-extract-load",
