@@ -9,7 +9,7 @@ In order to for Azure Data Factory to execute the curated pipeline, In ADF, you 
     DECLARE @EntityType VARCHAR(50) = 'Dimension'
     DECLARE @EntityName VARCHAR(50) = 'd_purchaseorders'
     DECLARE @ProcessorType VARCHAR(30) = 'databricks-notebook'
-    DECLARE @TargetKeyVaultSecret VARCHAR(50) = 'Source-WideWorldImporters'
+    DECLARE @TargetKeyVaultSecret VARCHAR(50) = ''
     DECLARE @Command VARCHAR(50) = 'Transform/Dimension/PurchaseOrders'
     DECLARE @Dependencies VARCHAR(30) = ''
     DECLARE @ParallelGroup INT = 1
@@ -39,7 +39,7 @@ The definitions for the variables used for the insertion are:
 |@EntityType          |Whether the entity type is a dimension or a fact.                  |
 |@EntityName          |Entity Name is the name of the curated layer.                      |
 |@ProcessorType       |Default code is `databricks-notebook`.                             |
-|@TargetKeyVaultSecret|Key Vault Secret used to access data from source.                  |
+|@TargetKeyVaultSecret|Key Vault Secret of Synapse server.                      |
 |@Dependencies        |providing any inter table dependencies.                            |
 |@ParallelGroup       |Used to run the notebooks in parallel and helps in reduced runtime.|
 |@Enabled             |Used to enable the curated notebook to run.                        |
@@ -77,7 +77,7 @@ The definitions for the variables used for the insertion are:
     DECLARE @EntityType VARCHAR(50) = 'Dimension'
     DECLARE @EntityName VARCHAR(50) = 'd_purchaseorders'
     DECLARE @ProcessorType VARCHAR(30) = 'databricks-notebook'
-    DECLARE @TargetKeyVaultSecret VARCHAR(50) = 'Source-WideWorldImporters'
+    DECLARE @TargetKeyVaultSecret VARCHAR(50) = ''
     DECLARE @Command VARCHAR(50) = 'Transform/Dimension/PurchaseOrders'
     DECLARE @Dependencies VARCHAR(30) = ''
     DECLARE @ParallelGroup INT = 1
@@ -111,7 +111,7 @@ The definitions for the variables used for the insertion are:
     DECLARE @EntityType VARCHAR(50) = 'Fact'
     DECLARE @EntityName VARCHAR(50) = 'f_purchaseorders'
     DECLARE @ProcessorType VARCHAR(30) = 'databricks-notebook'
-    DECLARE @TargetKeyVaultSecret VARCHAR(50) = 'Source-WideWorldImporters'
+    DECLARE @TargetKeyVaultSecret VARCHAR(50) = ''
     DECLARE @Command VARCHAR(50) = 'Transform/Fact/PurchaseOrders'
     DECLARE @Dependencies VARCHAR(30) = ''
     DECLARE @ParallelGroup INT = 2
