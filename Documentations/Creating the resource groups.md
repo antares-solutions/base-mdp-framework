@@ -6,7 +6,7 @@ For the MDP framework, three resource group is required:
 
 |Naming Convention|Environment|
 |-----------------|-----------|
-|mdp-dev-01       |DEV        |
+|rg-mdp-dev-01       |DEV        |
 
 Once the resource group is created, you will need to create or assign existing AAD group to the resource group with **Contributor** access, this is so developers & administrators can have access to the resource.
 
