@@ -12,7 +12,7 @@
 						"value": "@array(pipeline().parameters.taskList)",
 						"type": "Expression"
 					},
-					"isSequential": true,
+					"isSequential": false,
 					"activities": [
 						{
 							"name": "execute-curated",
@@ -50,6 +50,8 @@
 		"folder": {
 			"name": "ELT-Framework/Zone"
 		},
-		"annotations": []
-	}
+		"annotations": [],
+		"lastPublishTime": "2022-11-03T14:17:11Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
 }

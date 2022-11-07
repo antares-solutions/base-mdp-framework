@@ -67,7 +67,7 @@
 				"typeProperties": {
 					"variableName": "OutputFullPath",
 					"value": {
-						"value": "@replace(replace(replace(replace(replace(replace(\ncoalesce(pipeline().parameters.task.RawPath, '')\n,'$yyyy$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'yyyy'))\n,'$MM$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'MM'))\n,'$dd$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'dd'))\n,'$HH$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'HH'))\n,'$mm$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'mm'))\n,'$guid$', guid())",
+						"value": "@replace(replace(replace(replace(replace(replace(\npipeline().parameters.task.RawPath\n,'$yyyy$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'yyyy'))\n,'$MM$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'MM'))\n,'$dd$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'dd'))\n,'$HH$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'HH'))\n,'$mm$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'mm'))\n,'$guid$', guid())",
 						"type": "Expression"
 					}
 				}
@@ -183,7 +183,7 @@
 							"typeProperties": {
 								"variableName": "QueryClause",
 								"value": {
-									"value": "WHERE @{variables('WatermarkColumn')} > @{activity('low-high-watermark').output.firstRow.LowWatermark} AND @{variables('WatermarkColumn')} <= @{activity('low-high-watermark').output.firstRow.HighWatermark}",
+									"value": "WHERE @{variables('WatermarkColumn')} > '@{activity('low-high-watermark').output.firstRow.LowWatermark}' AND @{variables('WatermarkColumn')} <= '@{activity('low-high-watermark').output.firstRow.HighWatermark}'",
 									"type": "Expression"
 								}
 							}
@@ -343,15 +343,15 @@
 											"type": "DatasetReference",
 											"parameters": {
 												"kvSecret": {
-													"value": "@json(pipeline().parameters.task.ExtendedProperties).TargetKeyVaultSecret",
+													"value": "@pipeline().parameters.task.SourceKeyVaultSecret",
 													"type": "Expression"
 												},
 												"schemaName": {
-													"value": "@pipeline().parameters.task.DestinationSchema",
+													"value": "@pipeline().parameters.task.SourceSchema",
 													"type": "Expression"
 												},
 												"tableName": {
-													"value": "@pipeline().parameters.task.DestinationTableName",
+													"value": "@pipeline().parameters.task.SourceTableName",
 													"type": "Expression"
 												}
 											}
@@ -679,7 +679,7 @@
 			"name": "ELT-Framework/SourceHandler"
 		},
 		"annotations": [],
-		"lastPublishTime": "2021-07-08T10:40:24Z"
+		"lastPublishTime": "2022-11-03T14:17:11Z"
 	},
 	"type": "Microsoft.DataFactory/factories/pipelines"
 }

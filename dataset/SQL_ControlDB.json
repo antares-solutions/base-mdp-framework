@@ -1,0 +1,16 @@
+{
+	"name": "SQL_ControlDB",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "AzureSqlDatabase_Ctrldb",
+			"type": "LinkedServiceReference"
+		},
+		"folder": {
+			"name": "ELT-Framework/SQL"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": []
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

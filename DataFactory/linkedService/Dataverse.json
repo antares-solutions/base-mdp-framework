@@ -1,0 +1,35 @@
+{
+	"name": "Dataverse",
+	"type": "Microsoft.DataFactory/factories/linkedservices",
+	"properties": {
+		"type": "CommonDataServiceForApps",
+		"parameters": {
+			"kvSecret": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"typeProperties": {
+			"deploymentType": "Online",
+			"serviceUri": "https://antaressolutions.crm6.dynamics.com",
+			"authenticationType": "AADServicePrincipal",
+			"servicePrincipalCredentialType": "ServicePrincipalKey",
+			"servicePrincipalId": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "AzureKeyVault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "ADF-Dataverse-Service-Principle-ID"
+			},
+			"servicePrincipalCredential": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "AzureKeyVault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "ADF-Dataverse-Key"
+			}
+		}
+	}
+}

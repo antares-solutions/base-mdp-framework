@@ -1,0 +1,12 @@
+{
+	"name": "AzureSqlLS",
+	"type": "Microsoft.DataFactory/factories/linkedservices",
+	"properties": {
+		"annotations": [],
+		"type": "AzureSqlDatabase",
+		"typeProperties": {
+			"connectionString": "integrated security=False;encrypt=True;connection timeout=30;data source=sql-base-mdp-dev-01.database.windows.net;initial catalog=ControlDB;user id=dbadmin",
+			"encryptedCredential": ""
+		}
+	}
+}

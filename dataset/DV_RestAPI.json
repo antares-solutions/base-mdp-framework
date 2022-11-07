@@ -1,0 +1,19 @@
+{
+	"name": "DV_RestAPI",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "DataVerseRestService",
+			"type": "LinkedServiceReference"
+		},
+		"folder": {
+			"name": "ELT-Framework/DV"
+		},
+		"annotations": [],
+		"type": "RestResource",
+		"typeProperties": {
+			"relativeUrl": ""
+		},
+		"schema": []
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

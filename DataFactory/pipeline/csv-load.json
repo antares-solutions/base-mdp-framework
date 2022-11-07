@@ -96,12 +96,6 @@
 						"dependencyConditions": [
 							"Succeeded"
 						]
-					},
-					{
-						"activity": "Input-Filepath_ID",
-						"dependencyConditions": [
-							"Succeeded"
-						]
 					}
 				],
 				"userProperties": [],
@@ -193,7 +187,7 @@
 			},
 			{
 				"name": "task-raw-path",
-				"type": "ExecutePipeline",
+				"type": "SqlServerStoredProcedure",
 				"dependsOn": [
 					{
 						"activity": "copy-CSV",
@@ -202,29 +196,52 @@
 						]
 					}
 				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
 				"userProperties": [],
 				"typeProperties": {
-					"pipeline": {
-						"referenceName": "log-status-update",
-						"type": "PipelineReference"
-					},
-					"waitOnCompletion": true,
-					"parameters": {
-						"ID": {
-							"value": "@pipeline().parameters.TaskDetails.ID",
-							"type": "Expression"
+					"storedProcedureName": "[dbo].[BatchUpdate]",
+					"storedProcedureParameters": {
+						"BatchID": {
+							"value": {
+								"value": "@pipeline().parameters.TaskDetails.BatchID",
+								"type": "Expression"
+							},
+							"type": "String"
 						},
-						"Property": "RawPath",
+						"SourceID": {
+							"value": {
+								"value": "@pipeline().parameters.TaskDetails.SourceID",
+								"type": "Expression"
+							},
+							"type": "Int32"
+						},
+						"Property": {
+							"value": "RawPath",
+							"type": "String"
+						},
 						"Value": {
-							"value": "@variables('OutputFullPath')",
-							"type": "Expression"
+							"value": {
+								"value": "@variables('OutputFullPath')",
+								"type": "Expression"
+							},
+							"type": "String"
 						}
 					}
+				},
+				"linkedServiceName": {
+					"referenceName": "AzureSqlDatabase_Ctrldb",
+					"type": "LinkedServiceReference"
 				}
 			},
 			{
 				"name": "log-copy",
-				"type": "ExecutePipeline",
+				"type": "SqlServerStoredProcedure",
 				"dependsOn": [
 					{
 						"activity": "copy-CSV",
@@ -233,37 +250,44 @@
 						]
 					}
 				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
 				"userProperties": [],
 				"typeProperties": {
-					"pipeline": {
-						"referenceName": "log-message",
-						"type": "PipelineReference"
-					},
-					"waitOnCompletion": true,
-					"parameters": {
-						"ID": {
-							"value": "@pipeline().parameters.TaskDetails.ID",
-							"type": "Expression"
+					"storedProcedureName": "[dbo].[LogMessage]",
+					"storedProcedureParameters": {
+						"BatchStatusID": {
+							"value": {
+								"value": "@pipeline().parameters.TaskDetails.ID",
+								"type": "Expression"
+							},
+							"type": "Int32"
 						},
-						"ActivityType": "copy-data",
+						"PipelineRunID": {
+							"value": null,
+							"type": "String"
+						},
+						"ActivityType": {
+							"value": "copy-data",
+							"type": "String"
+						},
 						"Message": {
-							"value": "@{activity('copy-CSV')}",
-							"type": "Expression"
+							"value": {
+								"value": "@{activity('copy-CSV')}",
+								"type": "Expression"
+							},
+							"type": "String"
 						}
 					}
-				}
-			},
-			{
-				"name": "Input-Filepath_ID",
-				"type": "SetVariable",
-				"dependsOn": [],
-				"userProperties": [],
-				"typeProperties": {
-					"variableName": "InputID",
-					"value": {
-						"value": "@string(pipeline().parameters.TaskDetails.ID)",
-						"type": "Expression"
-					}
+				},
+				"linkedServiceName": {
+					"referenceName": "AzureSqlDatabase_Ctrldb",
+					"type": "LinkedServiceReference"
 				}
 			}
 		],
@@ -290,14 +314,13 @@
 			},
 			"InputFullPath": {
 				"type": "String"
-			},
-			"InputID": {
-				"type": "String"
 			}
 		},
 		"folder": {
 			"name": "ELT-Framework/SourceHandler/DLS"
 		},
-		"annotations": []
-	}
+		"annotations": [],
+		"lastPublishTime": "2022-11-03T14:17:11Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
 }

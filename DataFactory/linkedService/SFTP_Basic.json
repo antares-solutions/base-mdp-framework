@@ -1,5 +1,6 @@
 {
 	"name": "SFTP_Basic",
+	"type": "Microsoft.DataFactory/factories/linkedservices",
 	"properties": {
 		"annotations": [],
 		"type": "Sftp",

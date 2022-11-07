@@ -1,0 +1,476 @@
+{
+	"name": "dv-load",
+	"properties": {
+		"activities": [
+			{
+				"name": "if-delta",
+				"type": "IfCondition",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@and(\n        and(\n            and(not(empty(pipeline().parameters.task.TrustedHandler)), not(contains(pipeline().parameters.task.TrustedHandler, 'null'))), \n                and(not(empty(pipeline().parameters.task.TrustedPath)), not(contains(pipeline().parameters.task.TrustedPath, 'null'))))\n        ,and(not(empty(pipeline().parameters.task.WatermarkColumn)), not(contains(pipeline().parameters.task.WatermarkColumn, 'null')))\n)",
+						"type": "Expression"
+					},
+					"ifTrueActivities": [
+						{
+							"name": "high-watermark",
+							"type": "Lookup",
+							"dependsOn": [
+								{
+									"activity": "set-query-clause",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "CommonDataServiceForAppsSource",
+									"query": {
+										"value": "@replace(\n        replace(\n                replace(\n                    '<fetch mapping=\"$A$\" distinct=\"true\" aggregate=\"true\">\n                        <entity name=\"$B$\">\n                            <attribute name=\"$C$\" alias=\"HighWatermark\" aggregate=\"max\" />                \n                        </entity>\n                    </fetch>', \n                    '$A$', pipeline().parameters.task.SourceSchema\n                ), \n                '$B$', \n                pipeline().parameters.task.SourceTableName\n            ), \n            '$C$',  \n            pipeline().parameters.task.WatermarkColumn\n            )",
+										"type": "Expression"
+									}
+								},
+								"dataset": {
+									"referenceName": "DV_Server",
+									"type": "DatasetReference",
+									"parameters": {
+										"kvSecret": {
+											"value": "@pipeline().parameters.task.SourceKeyVaultSecret",
+											"type": "Expression"
+										}
+									}
+								}
+							}
+						},
+						{
+							"name": "set-query-clause",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "QueryClause",
+								"value": {
+									"value": "@if(and(not(empty(pipeline().parameters.task.LowWatermark)), not(contains(pipeline().parameters.task.LowWatermark, 'null'))), \n    replace(\n        replace('<filter>\n                    <condition attribute=\"$A$\" operator=\"gt\" value=\"$B$\" />\n                </filter>', '$A$', pipeline().parameters.task.WatermarkColumn)\n    ,'$B$', pipeline().parameters.task.LowWatermark), '')",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "task-high-watermark",
+							"type": "ExecutePipeline",
+							"dependsOn": [
+								{
+									"activity": "high-watermark",
+									"dependencyConditions": [
+										"Completed"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "log-status-update",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"ID": {
+										"value": "@pipeline().parameters.task.ID",
+										"type": "Expression"
+									},
+									"Property": "HighWatermark",
+									"Value": {
+										"value": "@{activity('high-watermark').output.firstRow.HighWatermark}",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "set-full-path",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "if-delta",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "OutputFullPath",
+					"value": {
+						"value": "@replace(replace(replace(replace(replace(replace(\npipeline().parameters.task.RawPath\n,'$yyyy$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'yyyy'))\n,'$MM$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'MM'))\n,'$dd$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'dd'))\n,'$HH$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'HH'))\n,'$mm$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'mm'))\n,'$guid$', guid())",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "set-query",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "if-delta",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "Query",
+					"value": {
+						"value": "@replace(\n    replace(\n        replace(\n            replace('<fetch mapping=\"$A$\"> \n                        <entity name=\"$B$\"> \n                            $C$\n                            $D$ \n                        </entity>\n                    </fetch>', \n            '$A$', \n            pipeline().parameters.task.SourceSchema\n            ),\n        '$B$',\n        pipeline().parameters.task.SourceTableName), \n    '$C$', if(not(empty(pipeline().parameters.task.SourceQuery)), pipeline().parameters.task.SourceQuery, '<all-attributes /> ')), \n'$D$', if(not(empty(variables('QueryClause'))), variables('QueryClause'), ''))",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "switch-copy-dv",
+				"type": "Switch",
+				"dependsOn": [
+					{
+						"activity": "set-query",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "set-full-path",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"on": {
+						"value": "@if(equals(length(split(pipeline().parameters.task.SourceHandler, '/')), 1), pipeline().parameters.task.SourceHandler, split(pipeline().parameters.task.SourceHandler, '/')[1])",
+						"type": "Expression"
+					},
+					"cases": [
+						{
+							"value": "sink-dv",
+							"activities": [
+								{
+									"name": "copy-sink-dv",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "CommonDataServiceForAppsSource",
+											"query": {
+												"value": "@variables('Query')",
+												"type": "Expression"
+											}
+										},
+										"sink": {
+											"type": "SqlServerSink",
+											"preCopyScript": {
+												"value": "BEGIN TRY EXEC('TRUNCATE TABLE [@{pipeline().parameters.task.SourceSchema}].[@{pipeline().parameters.task.SourceTableName}]') END TRY BEGIN CATCH END CATCH",
+												"type": "Expression"
+											},
+											"writeBehavior": "insert",
+											"sqlWriterUseTableLock": true,
+											"tableOption": "autoCreate"
+										},
+										"enableStaging": false,
+										"translator": {
+											"value": "@pipeline().parameters.task.SourceMetaData",
+											"type": "Expression"
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "DV_Server",
+											"type": "DatasetReference",
+											"parameters": {
+												"kvSecret": {
+													"value": "@pipeline().parameters.task.SourceKeyVaultSecret",
+													"type": "Expression"
+												}
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "SQL_Server_Table",
+											"type": "DatasetReference",
+											"parameters": {
+												"kvSecret": {
+													"value": "@pipeline().parameters.task.SourceKeyVaultSecret",
+													"type": "Expression"
+												},
+												"schemaName": {
+													"value": "@pipeline().parameters.task.SourceSchema",
+													"type": "Expression"
+												},
+												"tableName": {
+													"value": "@pipeline().parameters.task.SourceTableName",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								},
+								{
+									"name": "sink-dv-task-sink-row-count",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "copy-sink-dv",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "log-status-update",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"Property": "SinkRowCount",
+											"Value": {
+												"value": "@{activity('copy-sink-dv').output.rowsCopied}",
+												"type": "Expression"
+											}
+										}
+									}
+								},
+								{
+									"name": "sink-dv-log-copy",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "copy-sink-dv",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "log-message",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"ActivityType": "copy-data",
+											"Message": {
+												"value": "@{activity('copy-sink-dv')}",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						}
+					],
+					"defaultActivities": [
+						{
+							"name": "copy-dv",
+							"type": "Copy",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "CommonDataServiceForAppsSource",
+									"query": {
+										"value": "@variables('Query')",
+										"type": "Expression"
+									}
+								},
+								"sink": {
+									"type": "ParquetSink",
+									"storeSettings": {
+										"type": "AzureBlobFSWriteSettings"
+									},
+									"formatSettings": {
+										"type": "ParquetWriteSettings"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"value": "@pipeline().parameters.task.SourceMetaData",
+									"type": "Expression"
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "DV_Server",
+									"type": "DatasetReference",
+									"parameters": {
+										"kvSecret": {
+											"value": "@pipeline().parameters.task.SourceKeyVaultSecret",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "DLS_Parquet",
+									"type": "DatasetReference",
+									"parameters": {
+										"BlobPath": {
+											"value": "@variables('OutputFullPath')",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"name": "task-raw-path",
+							"type": "ExecutePipeline",
+							"dependsOn": [
+								{
+									"activity": "copy-dv",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "log-status-update",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"ID": {
+										"value": "@pipeline().parameters.task.ID",
+										"type": "Expression"
+									},
+									"Property": "RawPath",
+									"Value": {
+										"value": "@variables('OutputFullPath')",
+										"type": "Expression"
+									}
+								}
+							}
+						},
+						{
+							"name": "task-sink-row-count",
+							"type": "ExecutePipeline",
+							"dependsOn": [
+								{
+									"activity": "copy-dv",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "log-status-update",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"ID": {
+										"value": "@pipeline().parameters.task.ID",
+										"type": "Expression"
+									},
+									"Property": "SinkRowCount",
+									"Value": {
+										"value": "@{activity('copy-dv').output.rowsCopied}",
+										"type": "Expression"
+									}
+								}
+							}
+						},
+						{
+							"name": "log-copy",
+							"type": "ExecutePipeline",
+							"dependsOn": [
+								{
+									"activity": "copy-dv",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "log-message",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"ID": {
+										"value": "@pipeline().parameters.task.ID",
+										"type": "Expression"
+									},
+									"ActivityType": "copy-data",
+									"Message": {
+										"value": "@{activity('copy-dv')}",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"task": {
+				"type": "object"
+			}
+		},
+		"variables": {
+			"Query": {
+				"type": "String"
+			},
+			"OutputFullPath": {
+				"type": "String"
+			},
+			"QueryClause": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "ELT-Framework/SourceHandler/Dataverse"
+		},
+		"annotations": [],
+		"lastPublishTime": "2022-11-03T14:17:11Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

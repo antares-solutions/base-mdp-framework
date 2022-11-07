@@ -85,6 +85,8 @@
 		"folder": {
 			"name": "ELT-Framework/EmailTrigger"
 		},
-		"annotations": []
-	}
+		"annotations": [],
+		"lastPublishTime": "2022-06-23T06:15:03Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
 }

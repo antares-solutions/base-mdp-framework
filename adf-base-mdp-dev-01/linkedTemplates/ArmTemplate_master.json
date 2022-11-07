@@ -7,6 +7,14 @@
 			"metadata": "Data Factory name",
 			"defaultValue": "adf-base-mdp-dev-01"
 		},
+		"AzureSqlLS_connectionString": {
+			"type": "secureString",
+			"metadata": "Secure string for 'connectionString' of 'AzureSqlLS'"
+		},
+		"LinkedserviceLS_connectionString": {
+			"type": "secureString",
+			"metadata": "Secure string for 'connectionString' of 'LinkedserviceLS'"
+		},
 		"AmazonS3_properties_typeProperties_accessKeyId": {
 			"type": "object",
 			"defaultValue": {
@@ -25,6 +33,17 @@
 			"type": "string",
 			"defaultValue": "https://dlsbasemdpdev01.dfs.core.windows.net"
 		},
+		"AzureDatabricks_defaultCluster_properties_typeProperties_existingClusterId": {
+			"type": "object",
+			"defaultValue": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "AzureKeyVault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "Databricks-ClusterId"
+			}
+		},
 		"AzureKeyVault_properties_typeProperties_baseUrl": {
 			"type": "string",
 			"defaultValue": "https://akv-base-mdp-dev-01.vault.azure.net/"
@@ -33,9 +52,38 @@
 			"type": "string",
 			"defaultValue": "ADF-ControlDB"
 		},
+		"Dataverse_properties_typeProperties_servicePrincipalId": {
+			"type": "object",
+			"defaultValue": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "AzureKeyVault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "ADF-Dataverse-Service-Principle-ID"
+			}
+		},
 		"HttpLinkAnonymous_properties_typeProperties_url": {
 			"type": "string",
 			"defaultValue": "@{linkedService().url}"
+		},
+		"NetworkFileShare_properties_typeProperties_host": {
+			"type": "object",
+			"defaultValue": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "AzureKeyVault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": {
+					"value": "@concat(linkedService().systemName, '-Host')",
+					"type": "Expression"
+				}
+			}
+		},
+		"NetworkFileShare_properties_typeProperties_userId": {
+			"type": "string",
+			"defaultValue": "au.antares.org\\shir01_svc"
 		},
 		"REST_Anonymous_properties_typeProperties_url": {
 			"type": "string",
@@ -67,18 +115,6 @@
 			"type": "string",
 			"defaultValue": "@linkedService().kvSecret"
 		},
-		"dataFactory_properties_globalParameters_keyVaultName_value": {
-			"type": "string",
-			"defaultValue": "akv-base-mdp-dev-01"
-		},
-		"dataFactory_properties_globalParameters_storageName_value": {
-			"type": "string",
-			"defaultValue": "dlsbasemdpdev01"
-		},
-		"dataFactory_location": {
-			"type": "string",
-			"defaultValue": "australiaeast"
-		},
 		"containerUri": {
 			"type": "string",
 			"metadata": "URI to storage account containing linked ARM templates"
@@ -106,14 +142,11 @@
 					"factoryName": {
 						"value": "[parameters('factoryName')]"
 					},
-					"dataFactory_properties_globalParameters_keyVaultName_value": {
-						"value": "[parameters('dataFactory_properties_globalParameters_keyVaultName_value')]"
+					"AzureSqlLS_connectionString": {
+						"value": "[parameters('AzureSqlLS_connectionString')]"
 					},
-					"dataFactory_properties_globalParameters_storageName_value": {
-						"value": "[parameters('dataFactory_properties_globalParameters_storageName_value')]"
-					},
-					"dataFactory_location": {
-						"value": "[parameters('dataFactory_location')]"
+					"LinkedserviceLS_connectionString": {
+						"value": "[parameters('LinkedserviceLS_connectionString')]"
 					},
 					"AzureKeyVault_properties_typeProperties_baseUrl": {
 						"value": "[parameters('AzureKeyVault_properties_typeProperties_baseUrl')]"
@@ -130,8 +163,20 @@
 					"AzureDataLakeStorage_properties_typeProperties_url": {
 						"value": "[parameters('AzureDataLakeStorage_properties_typeProperties_url')]"
 					},
+					"AzureDatabricks_defaultCluster_properties_typeProperties_existingClusterId": {
+						"value": "[parameters('AzureDatabricks_defaultCluster_properties_typeProperties_existingClusterId')]"
+					},
 					"AzureSqlDatabase_Ctrldb_properties_typeProperties_connectionString_secretName": {
 						"value": "[parameters('AzureSqlDatabase_Ctrldb_properties_typeProperties_connectionString_secretName')]"
+					},
+					"Dataverse_properties_typeProperties_servicePrincipalId": {
+						"value": "[parameters('Dataverse_properties_typeProperties_servicePrincipalId')]"
+					},
+					"NetworkFileShare_properties_typeProperties_host": {
+						"value": "[parameters('NetworkFileShare_properties_typeProperties_host')]"
+					},
+					"NetworkFileShare_properties_typeProperties_userId": {
+						"value": "[parameters('NetworkFileShare_properties_typeProperties_userId')]"
 					},
 					"SFTP_Basic_properties_typeProperties_host": {
 						"value": "[parameters('SFTP_Basic_properties_typeProperties_host')]"
@@ -184,6 +229,26 @@
 			},
 			"dependsOn": [
 				"[resourceId('Microsoft.Resources/deployments', 'adf-base-mdp-dev-01_ArmTemplate_1')]"
+			]
+		},
+		{
+			"name": "adf-base-mdp-dev-01_ArmTemplate_3",
+			"type": "Microsoft.Resources/deployments",
+			"apiVersion": "2018-02-01",
+			"properties": {
+				"mode": "incremental",
+				"templateLink": {
+					"uri": "[concat(parameters('containerUri'), '/ArmTemplate_3.json', parameters('containerSasToken'))]",
+					"contentVersion": "1.0.0.0"
+				},
+				"parameters": {
+					"factoryName": {
+						"value": "[parameters('factoryName')]"
+					}
+				}
+			},
+			"dependsOn": [
+				"[resourceId('Microsoft.Resources/deployments', 'adf-base-mdp-dev-01_ArmTemplate_2')]"
 			]
 		}
 	]

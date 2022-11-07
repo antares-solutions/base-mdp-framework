@@ -1,5 +1,6 @@
 {
 	"name": "AzureDatabricks_defaultCluster",
+	"type": "Microsoft.DataFactory/factories/linkedservices",
 	"properties": {
 		"type": "AzureDatabricks",
 		"annotations": [],

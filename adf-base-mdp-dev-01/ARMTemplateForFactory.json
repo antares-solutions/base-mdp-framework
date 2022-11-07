@@ -7,6 +7,14 @@
 			"metadata": "Data Factory name",
 			"defaultValue": "adf-base-mdp-dev-01"
 		},
+		"AzureSqlLS_connectionString": {
+			"type": "secureString",
+			"metadata": "Secure string for 'connectionString' of 'AzureSqlLS'"
+		},
+		"LinkedserviceLS_connectionString": {
+			"type": "secureString",
+			"metadata": "Secure string for 'connectionString' of 'LinkedserviceLS'"
+		},
 		"AmazonS3_properties_typeProperties_accessKeyId": {
 			"type": "object",
 			"defaultValue": {
@@ -25,6 +33,17 @@
 			"type": "string",
 			"defaultValue": "https://dlsbasemdpdev01.dfs.core.windows.net"
 		},
+		"AzureDatabricks_defaultCluster_properties_typeProperties_existingClusterId": {
+			"type": "object",
+			"defaultValue": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "AzureKeyVault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "Databricks-ClusterId"
+			}
+		},
 		"AzureKeyVault_properties_typeProperties_baseUrl": {
 			"type": "string",
 			"defaultValue": "https://akv-base-mdp-dev-01.vault.azure.net/"
@@ -33,9 +52,38 @@
 			"type": "string",
 			"defaultValue": "ADF-ControlDB"
 		},
+		"Dataverse_properties_typeProperties_servicePrincipalId": {
+			"type": "object",
+			"defaultValue": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "AzureKeyVault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "ADF-Dataverse-Service-Principle-ID"
+			}
+		},
 		"HttpLinkAnonymous_properties_typeProperties_url": {
 			"type": "string",
 			"defaultValue": "@{linkedService().url}"
+		},
+		"NetworkFileShare_properties_typeProperties_host": {
+			"type": "object",
+			"defaultValue": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "AzureKeyVault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": {
+					"value": "@concat(linkedService().systemName, '-Host')",
+					"type": "Expression"
+				}
+			}
+		},
+		"NetworkFileShare_properties_typeProperties_userId": {
+			"type": "string",
+			"defaultValue": "au.antares.org\\shir01_svc"
 		},
 		"REST_Anonymous_properties_typeProperties_url": {
 			"type": "string",
@@ -66,18 +114,6 @@
 		"SQLServer_properties_typeProperties_connectionString_secretName": {
 			"type": "string",
 			"defaultValue": "@linkedService().kvSecret"
-		},
-		"dataFactory_properties_globalParameters_keyVaultName_value": {
-			"type": "string",
-			"defaultValue": "akv-base-mdp-dev-01"
-		},
-		"dataFactory_properties_globalParameters_storageName_value": {
-			"type": "string",
-			"defaultValue": "dlsbasemdpdev01"
-		},
-		"dataFactory_location": {
-			"type": "string",
-			"defaultValue": "australiaeast"
 		}
 	},
 	"variables": {
@@ -100,6 +136,7 @@
 								"value": "@array(pipeline().parameters.taskList)",
 								"type": "Expression"
 							},
+							"isSequential": false,
 							"activities": [
 								{
 									"name": "execute-curated",
@@ -141,10 +178,10 @@
 				"folder": {
 					"name": "ELT-Framework/Zone"
 				},
-				"annotations": []
+				"annotations": [],
+				"lastPublishTime": "2022-11-03T14:17:11Z"
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
 				"[concat(variables('factoryId'), '/pipelines/Curated')]"
 			]
 		},
@@ -535,10 +572,10 @@
 				"folder": {
 					"name": "ELT-Framework/Zone"
 				},
-				"annotations": []
+				"annotations": [],
+				"lastPublishTime": "2022-11-03T14:17:11Z"
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
 				"[concat(variables('factoryId'), '/pipelines/log-status-update')]",
 				"[concat(variables('factoryId'), '/linkedServices/AzureDatabricks_defaultCluster')]",
 				"[concat(variables('factoryId'), '/pipelines/log-message')]",
@@ -575,7 +612,7 @@
 							"source": {
 								"type": "AzureSqlSource",
 								"sqlReaderQuery": {
-									"value": "DECLARE @SystemCodes VARCHAR(50) = '@{pipeline().parameters.SystemCodes}';\nWITH [_SystemCodes] AS (\n\tSELECT DISTINCT TRIM(value) [SystemCode] FROM STRING_SPLIT(IIF(LEN(TRIM(@SystemCodes))=0, NULL, @SystemCodes), ',')\n)\nSELECT \nDISTINCT\nLEFT([SourceID], 2) [Order], M.[SystemCode]\nFROM [dbo].[ExtractLoadManifest] M\nJOIN [_SystemCodes] C ON C.[SystemCode] = M.[SystemCode] \nWHERE [Enabled] = 1 \nUNION \nSELECT \nDISTINCT\nLEFT([SourceID], 2) [Order], M.[SystemCode]\nFROM [dbo].[ExtractLoadManifest] M\nWHERE [Enabled] = 1 AND (SELECT COUNT(*) FROM [_SystemCodes]) = 0\nORDER BY 1",
+									"value": "DECLARE @SystemCodes VARCHAR(50) = '@{pipeline().parameters.SystemCodes}';\nDECLARE @BatchSize INT = @{pipeline().parameters.BatchSize};\nWITH\n    [_SystemCodes]\n    AS\n    (\n        SELECT DISTINCT TRIM(value) [SystemCode]\n        FROM STRING_SPLIT(IIF(LEN(TRIM(@SystemCodes))=0, NULL, @SystemCodes), ',')\n    ),\n\tExtractLoad AS\n\t(\n\t\tSELECT ROW_NUMBER() OVER(ORDER BY M.[SourceID]) / @BatchSize [Order], M.[SystemCode], M.[SourceID]\n\t\tFROM [dbo].[ExtractLoadManifest] M JOIN [_SystemCodes] C ON C.[SystemCode] = M.[SystemCode]\n\t\tWHERE [Enabled] = 1\n\t\tUNION\n\t\tSELECT ROW_NUMBER() OVER(ORDER BY M.[SourceID]) / @BatchSize [Order], M.[SystemCode], M.[SourceID]\n\t\tFROM [dbo].[ExtractLoadManifest] M\n\t\tWHERE [Enabled] = 1 AND (SELECT COUNT(*)\n\t\tFROM [_SystemCodes]) = 0\n\t)\n\tSELECT SystemCode, MIN([SourceID]) StartSourceID, MAX([SourceID]) EndSourceID\n\tFROM ExtractLoad\n\tGROUP BY [Order], [SystemCode]\n\tORDER BY [Order], MIN([SourceID])",
 									"type": "Expression"
 								},
 								"partitionOption": "None"
@@ -626,6 +663,14 @@
 											},
 											"ParentBatchID": {
 												"value": "@variables('ParentBatchID')",
+												"type": "Expression"
+											},
+											"StartSourceID": {
+												"value": "@item().StartSourceID",
+												"type": "Expression"
+											},
+											"EndSourceID": {
+												"value": "@item().EndSourceID",
 												"type": "Expression"
 											}
 										}
@@ -695,6 +740,10 @@
 				"parameters": {
 					"SystemCodes": {
 						"type": "string"
+					},
+					"BatchSize": {
+						"type": "int",
+						"defaultValue": 500
 					}
 				},
 				"variables": {
@@ -713,10 +762,9 @@
 					"name": "ELT-Framework"
 				},
 				"annotations": [],
-				"lastPublishTime": "2021-07-08T02:50:54Z"
+				"lastPublishTime": "2022-11-03T14:17:12Z"
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
 				"[concat(variables('factoryId'), '/datasets/SQL_ControlDB')]",
 				"[concat(variables('factoryId'), '/pipelines/System')]",
 				"[concat(variables('factoryId'), '/pipelines/Transform')]"
@@ -961,6 +1009,30 @@
 											}
 										}
 									]
+								},
+								{
+									"value": "dv-load",
+									"activities": [
+										{
+											"name": "execute-dv-load",
+											"type": "ExecutePipeline",
+											"dependsOn": [],
+											"userProperties": [],
+											"typeProperties": {
+												"pipeline": {
+													"referenceName": "dv-load",
+													"type": "PipelineReference"
+												},
+												"waitOnCompletion": true,
+												"parameters": {
+													"task": {
+														"value": "@pipeline().parameters.task",
+														"type": "Expression"
+													}
+												}
+											}
+										}
+									]
 								}
 							]
 						}
@@ -970,7 +1042,7 @@
 						"type": "IfCondition",
 						"dependsOn": [
 							{
-								"activity": "switch-source-handler",
+								"activity": "task-status",
 								"dependencyConditions": [
 									"Succeeded"
 								]
@@ -979,21 +1051,14 @@
 						"userProperties": [],
 						"typeProperties": {
 							"expression": {
-								"value": "@not(empty(pipeline().parameters.task.RawHandler))",
+								"value": "@and(not(empty(pipeline().parameters.task.RawHandler)), \n    and(not(equals(activity('task-status').output.firstRow.SinkRowCount, null)),\n        greater(activity('task-status').output.firstRow.SinkRowCount, 0))\n)",
 								"type": "Expression"
 							},
 							"ifTrueActivities": [
 								{
 									"name": "raw-databricks",
 									"type": "DatabricksNotebook",
-									"dependsOn": [
-										{
-											"activity": "task-status",
-											"dependencyConditions": [
-												"Succeeded"
-											]
-										}
-									],
+									"dependsOn": [],
 									"policy": {
 										"timeout": "7.00:00:00",
 										"retry": 0,
@@ -1021,66 +1086,6 @@
 									"linkedServiceName": {
 										"referenceName": "AzureDatabricks_defaultCluster",
 										"type": "LinkedServiceReference"
-									}
-								},
-								{
-									"name": "task-status",
-									"type": "Lookup",
-									"dependsOn": [],
-									"policy": {
-										"timeout": "7.00:00:00",
-										"retry": 0,
-										"retryIntervalInSeconds": 30,
-										"secureOutput": false,
-										"secureInput": false
-									},
-									"userProperties": [],
-									"typeProperties": {
-										"source": {
-											"type": "AzureSqlSource",
-											"sqlReaderQuery": {
-												"value": "SELECT * FROM [dbo].[ExtractLoadStatus] WHERE [BatchID] = '@{pipeline().parameters.task.BatchID}' AND [SourceID] = '@{pipeline().parameters.task.SourceID}'",
-												"type": "Expression"
-											},
-											"queryTimeout": "02:00:00",
-											"partitionOption": "None"
-										},
-										"dataset": {
-											"referenceName": "SQL_ControlDB",
-											"type": "DatasetReference",
-											"parameters": {}
-										}
-									}
-								},
-								{
-									"name": "log-databricks",
-									"type": "ExecutePipeline",
-									"dependsOn": [
-										{
-											"activity": "raw-databricks",
-											"dependencyConditions": [
-												"Completed"
-											]
-										}
-									],
-									"userProperties": [],
-									"typeProperties": {
-										"pipeline": {
-											"referenceName": "log-message",
-											"type": "PipelineReference"
-										},
-										"waitOnCompletion": false,
-										"parameters": {
-											"ID": {
-												"value": "@pipeline().parameters.task.ID",
-												"type": "Expression"
-											},
-											"ActivityType": "raw-databricks",
-											"Message": {
-												"value": "@{activity('raw-databricks')}",
-												"type": "Expression"
-											}
-										}
 									}
 								}
 							]
@@ -1232,6 +1237,104 @@
 								"TableName": "ExtractLoadStatus"
 							}
 						}
+					},
+					{
+						"name": "task-status",
+						"type": "Lookup",
+						"dependsOn": [
+							{
+								"activity": "switch-source-handler",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": {
+									"value": "SELECT * FROM [dbo].[ExtractLoadStatus] WHERE [BatchID] = '@{pipeline().parameters.task.BatchID}' AND [SourceID] = '@{pipeline().parameters.task.SourceID}'",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "SQL_ControlDB",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						}
+					},
+					{
+						"name": "log-databricks-failure",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "if-raw-handler",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "log-message",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"ID": {
+									"value": "@pipeline().parameters.task.ID",
+									"type": "Expression"
+								},
+								"ActivityType": "raw-databricks",
+								"Message": {
+									"value": "@{activity('raw-databricks')}",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "log-databricks-success",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "if-raw-handler",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "log-message",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"ID": {
+									"value": "@pipeline().parameters.task.ID",
+									"type": "Expression"
+								},
+								"ActivityType": "raw-databricks",
+								"Message": {
+									"value": "@{activity('raw-databricks')}",
+									"type": "Expression"
+								}
+							}
+						}
 					}
 				],
 				"policy": {
@@ -1246,14 +1349,14 @@
 				"folder": {
 					"name": "ELT-Framework/Zone"
 				},
-				"annotations": []
+				"annotations": [],
+				"lastPublishTime": "2022-11-03T14:17:11Z"
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
 				"[concat(variables('factoryId'), '/pipelines/log-status-update')]",
-				"[concat(variables('factoryId'), '/linkedServices/AzureDatabricks_defaultCluster')]",
 				"[concat(variables('factoryId'), '/datasets/SQL_ControlDB')]",
 				"[concat(variables('factoryId'), '/pipelines/log-message')]",
+				"[concat(variables('factoryId'), '/linkedServices/AzureDatabricks_defaultCluster')]",
 				"[concat(variables('factoryId'), '/pipelines/sql-load')]",
 				"[concat(variables('factoryId'), '/pipelines/csv-load')]",
 				"[concat(variables('factoryId'), '/pipelines/excel-load')]",
@@ -1262,7 +1365,302 @@
 				"[concat(variables('factoryId'), '/pipelines/canvas-load')]",
 				"[concat(variables('factoryId'), '/pipelines/canvas-graphql-load')]",
 				"[concat(variables('factoryId'), '/pipelines/canvas-graphql-load-by-course')]",
-				"[concat(variables('factoryId'), '/pipelines/s3-binary-load')]"
+				"[concat(variables('factoryId'), '/pipelines/s3-binary-load')]",
+				"[concat(variables('factoryId'), '/pipelines/dv-load')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Run-Raw-Pipeline')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "set-parent-batch",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "ParentBatchID",
+							"value": {
+								"value": "@substring(pipeline().GroupId, 0,8)",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "get-tasks",
+						"description": "",
+						"type": "Lookup",
+						"dependsOn": [
+							{
+								"activity": "set-parent-batch",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderStoredProcedureName": "[[dbo].[ExtractLoadInit]",
+								"storedProcedureParameters": {
+									"BatchID": {
+										"value": {
+											"value": "@variables('ParentBatchID')",
+											"type": "Expression"
+										}
+									},
+									"SystemCode": {
+										"value": {
+											"value": "@pipeline().parameters.SystemCode",
+											"type": "Expression"
+										}
+									},
+									"StartSourceID": {
+										"type": "Int32",
+										"value": {
+											"value": "@pipeline().parameters.StartSourceID",
+											"type": "Expression"
+										}
+									},
+									"EndSourceID": {
+										"type": "Int32",
+										"value": {
+											"value": "@pipeline().parameters.EndSourceID",
+											"type": "Expression"
+										}
+									}
+								},
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "SQL_ControlDB",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"firstRowOnly": false
+						}
+					},
+					{
+						"name": "for-each-raw",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "get-tasks",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('get-tasks').output.value",
+								"type": "Expression"
+							},
+							"isSequential": false,
+							"batchCount": 10,
+							"activities": [
+								{
+									"name": "execute-raw",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "Raw",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"task": {
+												"value": "@item()",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"SystemCode": {
+						"type": "string"
+					},
+					"StartSourceID": {
+						"type": "string"
+					},
+					"EndSourceID": {
+						"type": "string"
+					}
+				},
+				"variables": {
+					"ParentBatchID": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/Management/Rerun Main Pipeline Individually"
+				},
+				"annotations": [],
+				"lastPublishTime": "2022-11-03T14:17:12Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/SQL_ControlDB')]",
+				"[concat(variables('factoryId'), '/pipelines/Raw')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Run-Trusted-Pipeline')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "get-tasks",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": {
+									"value": "\tSELECT S.BatchID, S.ID, S.LowWatermark\n\t,R.[SourceID]\n    ,R.[SystemCode]\n    ,[SourceSchema]\n    ,[SourceTableName]\n    ,[SourceQuery]\n    ,[SourceFolderPath]\n    ,[SourceFileName]\n    ,[SourceKeyVaultSecret]\n    ,[SourceHandler]\n    ,[LoadType]\n    ,[BusinessKeyColumn]\n    ,[WatermarkColumn]\n    ,[RawHandler]\n    ,R.[RawPath]\n    ,[TrustedHandler]\n    ,[TrustedPath]\n    ,[DestinationSchema]\n    ,[DestinationTableName]\n    ,[DestinationKeyVaultSecret]\n    ,[ExtendedProperties]\n\tFROM [dbo].[ExtractLoadStatus] S\n\tJOIN [dbo].[ExtractLoadManifest] R ON R.SourceID = S.SourceID\n\tWHERE \n\tS.BatchID = '@{pipeline().parameters.BatchId}'\n\tAND S.SystemCode = '@{pipeline().parameters.SystemCode}'\n\tAND R.[Enabled] = 1",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "SQL_ControlDB",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"firstRowOnly": false
+						}
+					},
+					{
+						"name": "for-each-trusted",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "get-tasks",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('get-tasks').output.value",
+								"type": "Expression"
+							},
+							"isSequential": false,
+							"batchCount": 10,
+							"activities": [
+								{
+									"name": "execute-trusted",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "Trusted",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"task": {
+												"value": "@item()",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "end-system",
+						"type": "Lookup",
+						"dependsOn": [
+							{
+								"activity": "for-each-trusted",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": {
+									"value": "UPDATE U\nSET [EndedDTS] = CONVERT(DATETIME, CONVERT(DATETIMEOFFSET, GETDATE()) AT TIME ZONE 'AUS Eastern Standard Time')\nFROM [dbo].[ExtractLoadStatus] U\nWHERE BatchID = '@{pipeline().parameters.BatchId}'\nAND SystemCode = '@{pipeline().parameters.SystemCode}'\nSELECT 1 A",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "SQL_ControlDB",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"firstRowOnly": false
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"BatchId": {
+						"type": "string"
+					},
+					"SystemCode": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/Management/Rerun Main Pipeline Individually"
+				},
+				"annotations": [],
+				"lastPublishTime": "2022-11-03T14:17:11Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/SQL_ControlDB')]",
+				"[concat(variables('factoryId'), '/pipelines/Trusted')]"
 			]
 		},
 		{
@@ -1305,6 +1703,18 @@
 									"SystemCode": {
 										"value": {
 											"value": "@pipeline().parameters.SystemCode",
+											"type": "Expression"
+										}
+									},
+									"StartSourceID": {
+										"value": {
+											"value": "@pipeline().parameters.StartSourceID",
+											"type": "Expression"
+										}
+									},
+									"EndSourceID": {
+										"value": {
+											"value": "@pipeline().parameters.EndSourceID",
 											"type": "Expression"
 										}
 									}
@@ -1381,7 +1791,7 @@
 							{
 								"activity": "for-each-raw",
 								"dependencyConditions": [
-									"Succeeded"
+									"Completed"
 								]
 							}
 						],
@@ -1465,6 +1875,12 @@
 					},
 					"ParentBatchID": {
 						"type": "string"
+					},
+					"StartSourceID": {
+						"type": "int"
+					},
+					"EndSourceID": {
+						"type": "int"
 					}
 				},
 				"variables": {
@@ -1476,10 +1892,9 @@
 					"name": "ELT-Framework"
 				},
 				"annotations": [],
-				"lastPublishTime": "2021-07-08T02:50:54Z"
+				"lastPublishTime": "2022-11-03T14:17:12Z"
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
 				"[concat(variables('factoryId'), '/datasets/SQL_ControlDB')]",
 				"[concat(variables('factoryId'), '/pipelines/Raw')]",
 				"[concat(variables('factoryId'), '/pipelines/Trusted')]"
@@ -1832,10 +2247,10 @@
 				"folder": {
 					"name": "ELT-Framework"
 				},
-				"annotations": []
+				"annotations": [],
+				"lastPublishTime": "2022-11-03T14:17:11Z"
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
 				"[concat(variables('factoryId'), '/datasets/SQL_ControlDB')]",
 				"[concat(variables('factoryId'), '/pipelines/synapse-operation')]",
 				"[concat(variables('factoryId'), '/pipelines/Curated-Parallel')]"
@@ -1852,7 +2267,7 @@
 						"type": "IfCondition",
 						"dependsOn": [
 							{
-								"activity": "log-status-start",
+								"activity": "raw-row-sink-count",
 								"dependencyConditions": [
 									"Succeeded"
 								]
@@ -1861,7 +2276,7 @@
 						"userProperties": [],
 						"typeProperties": {
 							"expression": {
-								"value": "@not(empty(pipeline().parameters.task.TrustedHandler))",
+								"value": "@and(not(empty(pipeline().parameters.task.TrustedHandler)), \n    and(not(equals(activity('raw-row-sink-count').output.firstRow.SinkRowCount, null)),\n    greater(activity('raw-row-sink-count').output.firstRow.SinkRowCount, 0))\n)",
 								"type": "Expression"
 							},
 							"ifTrueActivities": [
@@ -1892,37 +2307,6 @@
 									"linkedServiceName": {
 										"referenceName": "AzureDatabricks_defaultCluster",
 										"type": "LinkedServiceReference"
-									}
-								},
-								{
-									"name": "log-databricks",
-									"type": "ExecutePipeline",
-									"dependsOn": [
-										{
-											"activity": "trusted-databricks",
-											"dependencyConditions": [
-												"Completed"
-											]
-										}
-									],
-									"userProperties": [],
-									"typeProperties": {
-										"pipeline": {
-											"referenceName": "log-message",
-											"type": "PipelineReference"
-										},
-										"waitOnCompletion": false,
-										"parameters": {
-											"ID": {
-												"value": "@pipeline().parameters.task.ID",
-												"type": "Expression"
-											},
-											"ActivityType": "trusted-databricks",
-											"Message": {
-												"value": "@{activity('trusted-databricks')}",
-												"type": "Expression"
-											}
-										}
 									}
 								}
 							]
@@ -2074,6 +2458,104 @@
 								"TableName": "ExtractLoadStatus"
 							}
 						}
+					},
+					{
+						"name": "log-databricks-success",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "if-trusted-handler",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "log-message",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"ID": {
+									"value": "@pipeline().parameters.task.ID",
+									"type": "Expression"
+								},
+								"ActivityType": "trusted-databricks",
+								"Message": {
+									"value": "@{activity('trusted-databricks')}",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "log-databricks-failure",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "if-trusted-handler",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "log-message",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"ID": {
+									"value": "@pipeline().parameters.task.ID",
+									"type": "Expression"
+								},
+								"ActivityType": "trusted-databricks",
+								"Message": {
+									"value": "@{activity('trusted-databricks')}",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "raw-row-sink-count",
+						"type": "Lookup",
+						"dependsOn": [
+							{
+								"activity": "log-status-start",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": {
+									"value": "SELECT ISNULL(SinkRowCount, 0) AS SinkRowCount\nFROM dbo.ExtractLoadStatus\nWHERE BatchID = '@{pipeline().parameters.task.BatchID}' AND SourceID = @{pipeline().parameters.task.SourceID}",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "SQL_ControlDB",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						}
 					}
 				],
 				"policy": {
@@ -2088,13 +2570,14 @@
 				"folder": {
 					"name": "ELT-Framework/Zone"
 				},
-				"annotations": []
+				"annotations": [],
+				"lastPublishTime": "2022-11-03T14:17:11Z"
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
 				"[concat(variables('factoryId'), '/pipelines/log-status-update')]",
-				"[concat(variables('factoryId'), '/linkedServices/AzureDatabricks_defaultCluster')]",
-				"[concat(variables('factoryId'), '/pipelines/log-message')]"
+				"[concat(variables('factoryId'), '/pipelines/log-message')]",
+				"[concat(variables('factoryId'), '/datasets/SQL_ControlDB')]",
+				"[concat(variables('factoryId'), '/linkedServices/AzureDatabricks_defaultCluster')]"
 			]
 		},
 		{
@@ -2414,10 +2897,10 @@
 				"folder": {
 					"name": "ELT-Framework/SourceHandler/Canvas"
 				},
-				"annotations": []
+				"annotations": [],
+				"lastPublishTime": "2022-11-03T14:17:11Z"
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
 				"[concat(variables('factoryId'), '/linkedServices/AzureKeyVault')]",
 				"[concat(variables('factoryId'), '/pipelines/log-status-update')]",
 				"[concat(variables('factoryId'), '/datasets/REST_Binary')]",
@@ -2793,10 +3276,10 @@
 				"folder": {
 					"name": "ELT-Framework/SourceHandler/Canvas"
 				},
-				"annotations": []
+				"annotations": [],
+				"lastPublishTime": "2022-11-03T14:17:11Z"
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
 				"[concat(variables('factoryId'), '/linkedServices/AzureKeyVault')]",
 				"[concat(variables('factoryId'), '/pipelines/log-status-update')]"
 			]
@@ -3184,10 +3667,10 @@
 				"folder": {
 					"name": "ELT-Framework/SourceHandler/Canvas"
 				},
-				"annotations": []
+				"annotations": [],
+				"lastPublishTime": "2022-11-03T14:17:11Z"
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
 				"[concat(variables('factoryId'), '/linkedServices/AzureKeyVault')]",
 				"[concat(variables('factoryId'), '/pipelines/log-status-update')]"
 			]
@@ -3619,10 +4102,10 @@
 				"folder": {
 					"name": "ELT-Framework/SourceHandler/CompliSpace"
 				},
-				"annotations": []
+				"annotations": [],
+				"lastPublishTime": "2022-11-03T14:17:11Z"
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
 				"[concat(variables('factoryId'), '/linkedServices/AzureKeyVault')]",
 				"[concat(variables('factoryId'), '/pipelines/log-status-update')]",
 				"[concat(variables('factoryId'), '/datasets/REST_Binary')]",
@@ -3729,10 +4212,10 @@
 				"folder": {
 					"name": "ELT-Framework/Setup/Metadata"
 				},
-				"annotations": []
+				"annotations": [],
+				"lastPublishTime": "2022-11-03T14:17:11Z"
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
 				"[concat(variables('factoryId'), '/datasets/SQL_ControlDB')]",
 				"[concat(variables('factoryId'), '/datasets/SQL_Server')]"
 			]
@@ -4064,13 +4547,501 @@
 				"folder": {
 					"name": "ELT-Framework/SourceHandler/DLS"
 				},
-				"annotations": []
+				"annotations": [],
+				"lastPublishTime": "2022-11-03T14:17:11Z"
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
 				"[concat(variables('factoryId'), '/datasets/DLS_Csv')]",
 				"[concat(variables('factoryId'), '/datasets/DLS_Parquet')]",
 				"[concat(variables('factoryId'), '/linkedServices/AzureSqlDatabase_Ctrldb')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/dv-load')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "if-delta",
+						"type": "IfCondition",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@and(\n        and(\n            and(not(empty(pipeline().parameters.task.TrustedHandler)), not(contains(pipeline().parameters.task.TrustedHandler, 'null'))), \n                and(not(empty(pipeline().parameters.task.TrustedPath)), not(contains(pipeline().parameters.task.TrustedPath, 'null'))))\n        ,and(not(empty(pipeline().parameters.task.WatermarkColumn)), not(contains(pipeline().parameters.task.WatermarkColumn, 'null')))\n)",
+								"type": "Expression"
+							},
+							"ifTrueActivities": [
+								{
+									"name": "high-watermark",
+									"type": "Lookup",
+									"dependsOn": [
+										{
+											"activity": "set-query-clause",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "CommonDataServiceForAppsSource",
+											"query": {
+												"value": "@replace(\n        replace(\n                replace(\n                    '<fetch mapping=\"$A$\" distinct=\"true\" aggregate=\"true\">\n                        <entity name=\"$B$\">\n                            <attribute name=\"$C$\" alias=\"HighWatermark\" aggregate=\"max\" />                \n                        </entity>\n                    </fetch>', \n                    '$A$', pipeline().parameters.task.SourceSchema\n                ), \n                '$B$', \n                pipeline().parameters.task.SourceTableName\n            ), \n            '$C$',  \n            pipeline().parameters.task.WatermarkColumn\n            )",
+												"type": "Expression"
+											}
+										},
+										"dataset": {
+											"referenceName": "DV_Server",
+											"type": "DatasetReference",
+											"parameters": {
+												"kvSecret": {
+													"value": "@pipeline().parameters.task.SourceKeyVaultSecret",
+													"type": "Expression"
+												}
+											}
+										}
+									}
+								},
+								{
+									"name": "set-query-clause",
+									"type": "SetVariable",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "QueryClause",
+										"value": {
+											"value": "@if(and(not(empty(pipeline().parameters.task.LowWatermark)), not(contains(pipeline().parameters.task.LowWatermark, 'null'))), \n    replace(\n        replace('<filter>\n                    <condition attribute=\"$A$\" operator=\"gt\" value=\"$B$\" />\n                </filter>', '$A$', pipeline().parameters.task.WatermarkColumn)\n    ,'$B$', pipeline().parameters.task.LowWatermark), '')",
+											"type": "Expression"
+										}
+									}
+								},
+								{
+									"name": "task-high-watermark",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "high-watermark",
+											"dependencyConditions": [
+												"Completed"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "log-status-update",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"ID": {
+												"value": "@pipeline().parameters.task.ID",
+												"type": "Expression"
+											},
+											"Property": "HighWatermark",
+											"Value": {
+												"value": "@{activity('high-watermark').output.firstRow.HighWatermark}",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "set-full-path",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "if-delta",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "OutputFullPath",
+							"value": {
+								"value": "@replace(replace(replace(replace(replace(replace(\npipeline().parameters.task.RawPath\n,'$yyyy$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'yyyy'))\n,'$MM$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'MM'))\n,'$dd$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'dd'))\n,'$HH$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'HH'))\n,'$mm$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'mm'))\n,'$guid$', guid())",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "set-query",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "if-delta",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "Query",
+							"value": {
+								"value": "@replace(\n    replace(\n        replace(\n            replace('<fetch mapping=\"$A$\"> \n                        <entity name=\"$B$\"> \n                            $C$\n                            $D$ \n                        </entity>\n                    </fetch>', \n            '$A$', \n            pipeline().parameters.task.SourceSchema\n            ),\n        '$B$',\n        pipeline().parameters.task.SourceTableName), \n    '$C$', if(not(empty(pipeline().parameters.task.SourceQuery)), pipeline().parameters.task.SourceQuery, '<all-attributes /> ')), \n'$D$', if(not(empty(variables('QueryClause'))), variables('QueryClause'), ''))",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "switch-copy-dv",
+						"type": "Switch",
+						"dependsOn": [
+							{
+								"activity": "set-query",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "set-full-path",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"on": {
+								"value": "@if(equals(length(split(pipeline().parameters.task.SourceHandler, '/')), 1), pipeline().parameters.task.SourceHandler, split(pipeline().parameters.task.SourceHandler, '/')[1])",
+								"type": "Expression"
+							},
+							"cases": [
+								{
+									"value": "sink-dv",
+									"activities": [
+										{
+											"name": "copy-sink-dv",
+											"type": "Copy",
+											"dependsOn": [],
+											"policy": {
+												"timeout": "0.12:00:00",
+												"retry": 0,
+												"retryIntervalInSeconds": 30,
+												"secureOutput": false,
+												"secureInput": false
+											},
+											"userProperties": [],
+											"typeProperties": {
+												"source": {
+													"type": "CommonDataServiceForAppsSource",
+													"query": {
+														"value": "@variables('Query')",
+														"type": "Expression"
+													}
+												},
+												"sink": {
+													"type": "SqlServerSink",
+													"preCopyScript": {
+														"value": "BEGIN TRY EXEC('TRUNCATE TABLE [@{pipeline().parameters.task.SourceSchema}].[@{pipeline().parameters.task.SourceTableName}]') END TRY BEGIN CATCH END CATCH",
+														"type": "Expression"
+													},
+													"writeBehavior": "insert",
+													"sqlWriterUseTableLock": true,
+													"tableOption": "autoCreate"
+												},
+												"enableStaging": false,
+												"translator": {
+													"value": "@pipeline().parameters.task.SourceMetaData",
+													"type": "Expression"
+												}
+											},
+											"inputs": [
+												{
+													"referenceName": "DV_Server",
+													"type": "DatasetReference",
+													"parameters": {
+														"kvSecret": {
+															"value": "@pipeline().parameters.task.SourceKeyVaultSecret",
+															"type": "Expression"
+														}
+													}
+												}
+											],
+											"outputs": [
+												{
+													"referenceName": "SQL_Server_Table",
+													"type": "DatasetReference",
+													"parameters": {
+														"kvSecret": {
+															"value": "@pipeline().parameters.task.SourceKeyVaultSecret",
+															"type": "Expression"
+														},
+														"schemaName": {
+															"value": "@pipeline().parameters.task.SourceSchema",
+															"type": "Expression"
+														},
+														"tableName": {
+															"value": "@pipeline().parameters.task.SourceTableName",
+															"type": "Expression"
+														}
+													}
+												}
+											]
+										},
+										{
+											"name": "sink-dv-task-sink-row-count",
+											"type": "ExecutePipeline",
+											"dependsOn": [
+												{
+													"activity": "copy-sink-dv",
+													"dependencyConditions": [
+														"Succeeded"
+													]
+												}
+											],
+											"userProperties": [],
+											"typeProperties": {
+												"pipeline": {
+													"referenceName": "log-status-update",
+													"type": "PipelineReference"
+												},
+												"waitOnCompletion": true,
+												"parameters": {
+													"Property": "SinkRowCount",
+													"Value": {
+														"value": "@{activity('copy-sink-dv').output.rowsCopied}",
+														"type": "Expression"
+													}
+												}
+											}
+										},
+										{
+											"name": "sink-dv-log-copy",
+											"type": "ExecutePipeline",
+											"dependsOn": [
+												{
+													"activity": "copy-sink-dv",
+													"dependencyConditions": [
+														"Succeeded"
+													]
+												}
+											],
+											"userProperties": [],
+											"typeProperties": {
+												"pipeline": {
+													"referenceName": "log-message",
+													"type": "PipelineReference"
+												},
+												"waitOnCompletion": true,
+												"parameters": {
+													"ActivityType": "copy-data",
+													"Message": {
+														"value": "@{activity('copy-sink-dv')}",
+														"type": "Expression"
+													}
+												}
+											}
+										}
+									]
+								}
+							],
+							"defaultActivities": [
+								{
+									"name": "copy-dv",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "CommonDataServiceForAppsSource",
+											"query": {
+												"value": "@variables('Query')",
+												"type": "Expression"
+											}
+										},
+										"sink": {
+											"type": "ParquetSink",
+											"storeSettings": {
+												"type": "AzureBlobFSWriteSettings"
+											},
+											"formatSettings": {
+												"type": "ParquetWriteSettings"
+											}
+										},
+										"enableStaging": false,
+										"translator": {
+											"value": "@pipeline().parameters.task.SourceMetaData",
+											"type": "Expression"
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "DV_Server",
+											"type": "DatasetReference",
+											"parameters": {
+												"kvSecret": {
+													"value": "@pipeline().parameters.task.SourceKeyVaultSecret",
+													"type": "Expression"
+												}
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "DLS_Parquet",
+											"type": "DatasetReference",
+											"parameters": {
+												"BlobPath": {
+													"value": "@variables('OutputFullPath')",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								},
+								{
+									"name": "task-raw-path",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "copy-dv",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "log-status-update",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"ID": {
+												"value": "@pipeline().parameters.task.ID",
+												"type": "Expression"
+											},
+											"Property": "RawPath",
+											"Value": {
+												"value": "@variables('OutputFullPath')",
+												"type": "Expression"
+											}
+										}
+									}
+								},
+								{
+									"name": "task-sink-row-count",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "copy-dv",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "log-status-update",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"ID": {
+												"value": "@pipeline().parameters.task.ID",
+												"type": "Expression"
+											},
+											"Property": "SinkRowCount",
+											"Value": {
+												"value": "@{activity('copy-dv').output.rowsCopied}",
+												"type": "Expression"
+											}
+										}
+									}
+								},
+								{
+									"name": "log-copy",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "copy-dv",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "log-message",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"ID": {
+												"value": "@pipeline().parameters.task.ID",
+												"type": "Expression"
+											},
+											"ActivityType": "copy-data",
+											"Message": {
+												"value": "@{activity('copy-dv')}",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"task": {
+						"type": "object"
+					}
+				},
+				"variables": {
+					"Query": {
+						"type": "String"
+					},
+					"OutputFullPath": {
+						"type": "String"
+					},
+					"QueryClause": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/SourceHandler/Dataverse"
+				},
+				"annotations": [],
+				"lastPublishTime": "2022-11-03T14:17:11Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DV_Server')]",
+				"[concat(variables('factoryId'), '/pipelines/log-status-update')]",
+				"[concat(variables('factoryId'), '/datasets/DLS_Parquet')]",
+				"[concat(variables('factoryId'), '/pipelines/log-message')]",
+				"[concat(variables('factoryId'), '/datasets/SQL_Server_Table')]"
 			]
 		},
 		{
@@ -4167,11 +5138,10 @@
 				"folder": {
 					"name": "ELT-Framework/EmailTrigger"
 				},
-				"annotations": []
+				"annotations": [],
+				"lastPublishTime": "2022-11-03T14:17:10Z"
 			},
-			"dependsOn": [
-				"[variables('factoryId')]"
-			]
+			"dependsOn": []
 		},
 		{
 			"name": "[concat(parameters('factoryName'), '/excel-load')]",
@@ -4523,10 +5493,10 @@
 				"folder": {
 					"name": "ELT-Framework/SourceHandler/DLS"
 				},
-				"annotations": []
+				"annotations": [],
+				"lastPublishTime": "2022-11-03T14:17:11Z"
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
 				"[concat(variables('factoryId'), '/datasets/DLS_Excel_index')]",
 				"[concat(variables('factoryId'), '/datasets/DLS_Parquet')]",
 				"[concat(variables('factoryId'), '/linkedServices/AzureSqlDatabase_Ctrldb')]"
@@ -4721,10 +5691,10 @@
 				"folder": {
 					"name": "ELT-Framework/SourceHandler/DLS"
 				},
-				"annotations": []
+				"annotations": [],
+				"lastPublishTime": "2022-11-03T14:17:11Z"
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
 				"[concat(variables('factoryId'), '/datasets/DLS_Binary')]",
 				"[concat(variables('factoryId'), '/pipelines/log-status-update')]",
 				"[concat(variables('factoryId'), '/pipelines/log-message')]"
@@ -4924,10 +5894,10 @@
 				"folder": {
 					"name": "ELT-Framework/SourceHandler"
 				},
-				"annotations": []
+				"annotations": [],
+				"lastPublishTime": "2022-11-03T14:17:11Z"
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
 				"[concat(variables('factoryId'), '/datasets/HTTP_Binary')]",
 				"[concat(variables('factoryId'), '/datasets/DLS_Binary')]",
 				"[concat(variables('factoryId'), '/pipelines/log-status-update')]",
@@ -5122,10 +6092,10 @@
 				"folder": {
 					"name": "ELT-Framework/Setup"
 				},
-				"annotations": []
+				"annotations": [],
+				"lastPublishTime": "2022-11-03T14:17:11Z"
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
 				"[concat(variables('factoryId'), '/datasets/DLS_Csv')]",
 				"[concat(variables('factoryId'), '/datasets/SQL_ControlDB')]",
 				"[concat(variables('factoryId'), '/linkedServices/AzureSqlDatabase_Ctrldb')]"
@@ -5209,10 +6179,10 @@
 				"folder": {
 					"name": "ELT-Framework/Common/Logging"
 				},
-				"annotations": []
+				"annotations": [],
+				"lastPublishTime": "2022-11-03T14:17:10Z"
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
 				"[concat(variables('factoryId'), '/linkedServices/AzureSqlDatabase_Ctrldb')]"
 			]
 		},
@@ -5253,7 +6223,7 @@
 								},
 								"Value": {
 									"value": {
-										"value": "@pipeline().parameters.Value",
+										"value": "@if(equals(pipeline().parameters.Value, null), '', pipeline().parameters.Value)",
 										"type": "Expression"
 									},
 									"type": "String"
@@ -5294,11 +6264,579 @@
 				"folder": {
 					"name": "ELT-Framework/Common/Logging"
 				},
-				"annotations": []
+				"annotations": [],
+				"lastPublishTime": "2022-11-03T14:17:10Z"
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
 				"[concat(variables('factoryId'), '/linkedServices/AzureSqlDatabase_Ctrldb')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/nfs-binary-load')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "set-source-file-path",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "SourceFilePath",
+							"value": {
+								"value": "@pipeline().parameters.task.SourceQuery",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "set-output-full-path",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "OutputFullPath",
+							"value": {
+								"value": "@replace(replace(replace(replace(replace(replace(\npipeline().parameters.task.RawPath\n,'$yyyy$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'yyyy'))\n,'$MM$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'MM'))\n,'$dd$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'dd'))\n,'$HH$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'HH'))\n,'$mm$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'mm'))\n,'$guid$', guid())",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "if-file-exists",
+						"type": "IfCondition",
+						"dependsOn": [
+							{
+								"activity": "set-output-full-path",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "file-exists",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@bool(activity('file-exists').output.exists)",
+								"type": "Expression"
+							},
+							"ifFalseActivities": [
+								{
+									"name": "task-raw-path-skipped",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "log-status-update",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": false,
+										"parameters": {
+											"ID": {
+												"value": "@pipeline().parameters.task.ID",
+												"type": "Expression"
+											},
+											"Property": "RawPath",
+											"Value": "Skipped"
+										}
+									}
+								}
+							],
+							"ifTrueActivities": [
+								{
+									"name": "copy-nfs-binary-load",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [
+										{
+											"name": "Destination",
+											"value": "raw/Cewa Financials/"
+										}
+									],
+									"typeProperties": {
+										"source": {
+											"type": "BinarySource",
+											"storeSettings": {
+												"type": "FileServerReadSettings",
+												"recursive": true
+											},
+											"formatSettings": {
+												"type": "BinaryReadSettings"
+											}
+										},
+										"sink": {
+											"type": "BinarySink",
+											"storeSettings": {
+												"type": "AzureBlobFSWriteSettings"
+											}
+										},
+										"enableStaging": false
+									},
+									"inputs": [
+										{
+											"referenceName": "NFS_Binary",
+											"type": "DatasetReference",
+											"parameters": {
+												"systemName": {
+													"value": "@pipeline().parameters.task.SourceKeyVaultSecret",
+													"type": "Expression"
+												},
+												"filePath": {
+													"value": "@variables('SourceFilePath')",
+													"type": "Expression"
+												}
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "DLS_Binary",
+											"type": "DatasetReference",
+											"parameters": {
+												"filePath": {
+													"value": "@variables('OutputFullPath')",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								},
+								{
+									"name": "task-raw-path",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "copy-nfs-binary-load",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "log-status-update",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": false,
+										"parameters": {
+											"ID": {
+												"value": "@pipeline().parameters.task.ID",
+												"type": "Expression"
+											},
+											"Property": "RawPath",
+											"Value": {
+												"value": "@variables('OutputFullPath')",
+												"type": "Expression"
+											}
+										}
+									}
+								},
+								{
+									"name": "log-copy",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "copy-nfs-binary-load",
+											"dependencyConditions": [
+												"Completed"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "log-message",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": false,
+										"parameters": {
+											"ID": {
+												"value": "@pipeline().parameters.task.ID",
+												"type": "Expression"
+											},
+											"ActivityType": "copy-data",
+											"Message": {
+												"value": "@{activity('copy-nfs-binary-load')}",
+												"type": "Expression"
+											}
+										}
+									}
+								},
+								{
+									"name": "set-done",
+									"type": "SetVariable",
+									"dependsOn": [
+										{
+											"activity": "copy-nfs-binary-load",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "Done",
+										"value": true
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "file-exists",
+						"type": "GetMetadata",
+						"dependsOn": [
+							{
+								"activity": "set-source-file-path",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataset": {
+								"referenceName": "NFS_Binary",
+								"type": "DatasetReference",
+								"parameters": {
+									"systemName": {
+										"value": "@pipeline().parameters.task.SourceKeyVaultSecret",
+										"type": "Expression"
+									},
+									"filePath": {
+										"value": "@variables('SourceFilePath')",
+										"type": "Expression"
+									}
+								}
+							},
+							"fieldList": [
+								"exists"
+							],
+							"storeSettings": {
+								"type": "FileServerReadSettings",
+								"recursive": true,
+								"enablePartitionDiscovery": false
+							},
+							"formatSettings": {
+								"type": "BinaryReadSettings"
+							}
+						}
+					},
+					{
+						"name": "if-delete-file",
+						"type": "IfCondition",
+						"dependsOn": [
+							{
+								"activity": "if-file-exists",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@and(variables('DeleteFile'), variables('Done'))",
+								"type": "Expression"
+							},
+							"ifTrueActivities": [
+								{
+									"name": "delete-nfs-file",
+									"type": "Delete",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"dataset": {
+											"referenceName": "NFS_Binary",
+											"type": "DatasetReference",
+											"parameters": {
+												"systemName": {
+													"value": "@pipeline().parameters.task.SourceKeyVaultSecret",
+													"type": "Expression"
+												},
+												"filePath": "@variables('SourceFilePath')"
+											}
+										},
+										"enableLogging": false,
+										"storeSettings": {
+											"type": "FileServerReadSettings",
+											"recursive": true,
+											"enablePartitionDiscovery": false
+										}
+									}
+								}
+							]
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"task": {
+						"type": "object"
+					}
+				},
+				"variables": {
+					"OutputFullPath": {
+						"type": "String"
+					},
+					"SourceFilePath": {
+						"type": "String"
+					},
+					"DeleteFile": {
+						"type": "Boolean",
+						"defaultValue": false
+					},
+					"Done": {
+						"type": "Boolean",
+						"defaultValue": false
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/SourceHandler/NFS"
+				},
+				"annotations": [],
+				"lastPublishTime": "2022-06-23T06:15:05Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/NFS_Binary')]",
+				"[concat(variables('factoryId'), '/pipelines/log-status-update')]",
+				"[concat(variables('factoryId'), '/datasets/DLS_Binary')]",
+				"[concat(variables('factoryId'), '/pipelines/log-message')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/nfs-folder-load')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "copy-nfs-folder-load",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "set-output-full-path",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "set-source-file-path",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [
+							{
+								"name": "Destination",
+								"value": "raw/Cewa Financials/"
+							}
+						],
+						"typeProperties": {
+							"source": {
+								"type": "BinarySource",
+								"storeSettings": {
+									"type": "FileServerReadSettings",
+									"recursive": true
+								},
+								"formatSettings": {
+									"type": "BinaryReadSettings"
+								}
+							},
+							"sink": {
+								"type": "BinarySink",
+								"storeSettings": {
+									"type": "AzureBlobFSWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "NFS_Folder",
+								"type": "DatasetReference",
+								"parameters": {
+									"systemName": {
+										"value": "@pipeline().parameters.task.SourceKeyVaultSecret",
+										"type": "Expression"
+									},
+									"folderPath": {
+										"value": "@variables('SourceFilePath')",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DLS_Folder",
+								"type": "DatasetReference",
+								"parameters": {
+									"folderPath": {
+										"value": "@variables('SourceFilePath')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "set-source-file-path",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "SourceFilePath",
+							"value": {
+								"value": "@pipeline().parameters.task.SourceQuery",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "set-output-full-path",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "OutputFullPath",
+							"value": {
+								"value": "@replace(replace(replace(replace(replace(replace(\npipeline().parameters.task.RawPath\n,'$yyyy$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'yyyy'))\n,'$MM$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'MM'))\n,'$dd$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'dd'))\n,'$HH$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'HH'))\n,'$mm$', formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'mm'))\n,'$guid$', guid())",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "task-raw-path",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "copy-nfs-folder-load",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "log-status-update",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"ID": {
+									"value": "@pipeline().parameters.task.ID",
+									"type": "Expression"
+								},
+								"Property": "RawPath",
+								"Value": {
+									"value": "@variables('OutputFullPath')",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "log-copy",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "copy-nfs-folder-load",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "log-message",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": false,
+							"parameters": {
+								"ID": {
+									"value": "@pipeline().parameters.task.ID",
+									"type": "Expression"
+								},
+								"ActivityType": "copy-data",
+								"Message": {
+									"value": "@{activity('copy-nfs-folder-load')}",
+									"type": "Expression"
+								}
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"task": {
+						"type": "object"
+					}
+				},
+				"variables": {
+					"OutputFullPath": {
+						"type": "String"
+					},
+					"SourceFilePath": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/SourceHandler/NFS"
+				},
+				"annotations": [],
+				"lastPublishTime": "2022-06-23T06:15:04Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/NFS_Folder')]",
+				"[concat(variables('factoryId'), '/datasets/DLS_Folder')]",
+				"[concat(variables('factoryId'), '/pipelines/log-status-update')]",
+				"[concat(variables('factoryId'), '/pipelines/log-message')]"
 			]
 		},
 		{
@@ -5494,14 +7032,115 @@
 				"folder": {
 					"name": "ELT-Framework/SourceHandler/S3"
 				},
-				"annotations": []
+				"annotations": [],
+				"lastPublishTime": "2022-11-03T14:17:11Z"
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
 				"[concat(variables('factoryId'), '/datasets/S3_Binary_Folder')]",
 				"[concat(variables('factoryId'), '/datasets/DLS_Binary_Folder')]",
 				"[concat(variables('factoryId'), '/pipelines/log-status-update')]",
 				"[concat(variables('factoryId'), '/pipelines/log-message')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/send-email')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "send-email",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "get-url",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"url": {
+								"value": "@activity('get-url').output.value",
+								"type": "Expression"
+							},
+							"method": "POST",
+							"headers": {
+								"Content-Type": "application/json"
+							},
+							"body": {
+								"value": "{\n\t\"body\" : \"@{pipeline().parameters.body}\",\n\t\"subject\" : \"@{pipeline().parameters.subject}\",\n\t\"recipient\" : \"@{pipeline().parameters.email}\",\n\t\"importance\" : \"@{pipeline().parameters.importance}\"\n}",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "get-url",
+						"type": "WebActivity",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"url": {
+								"value": "https://@{pipeline().globalParameters.keyVaultName}.vault.azure.net/secrets/LogicApp-Url-Send-Email?api-version=7.0",
+								"type": "Expression"
+							},
+							"method": "GET",
+							"headers": {},
+							"linkedServices": [
+								{
+									"referenceName": "AzureKeyVault",
+									"type": "LinkedServiceReference"
+								}
+							],
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://vault.azure.net"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"email": {
+						"type": "string"
+					},
+					"subject": {
+						"type": "string"
+					},
+					"body": {
+						"type": "string"
+					},
+					"importance": {
+						"type": "string",
+						"defaultValue": "Normal"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/EmailTrigger"
+				},
+				"annotations": [],
+				"lastPublishTime": "2022-06-23T06:15:03Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureKeyVault')]"
 			]
 		},
 		{
@@ -6191,10 +7830,9 @@
 					"name": "ELT-Framework/SourceHandler"
 				},
 				"annotations": [],
-				"lastPublishTime": "2021-07-08T10:40:24Z"
+				"lastPublishTime": "2022-11-03T14:17:11Z"
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
 				"[concat(variables('factoryId'), '/datasets/SQL_Server')]",
 				"[concat(variables('factoryId'), '/pipelines/log-status-update')]",
 				"[concat(variables('factoryId'), '/pipelines/log-message')]",
@@ -6299,10 +7937,10 @@
 				"folder": {
 					"name": "ELT-Framework/Setup/Metadata"
 				},
-				"annotations": []
+				"annotations": [],
+				"lastPublishTime": "2022-11-03T14:17:11Z"
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
 				"[concat(variables('factoryId'), '/datasets/SQL_Server')]",
 				"[concat(variables('factoryId'), '/datasets/SQL_ControlDB')]"
 			]
@@ -6730,10 +8368,10 @@
 				"folder": {
 					"name": "ELT-Framework/Management/Synapse"
 				},
-				"annotations": []
+				"annotations": [],
+				"lastPublishTime": "2022-11-03T14:17:10Z"
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
 				"[concat(variables('factoryId'), '/linkedServices/AzureKeyVault')]"
 			]
 		},
@@ -6872,10 +8510,10 @@
 				"folder": {
 					"name": "ELT-Framework/Setup/Metadata"
 				},
-				"annotations": []
+				"annotations": [],
+				"lastPublishTime": "2022-11-03T14:17:11Z"
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
 				"[concat(variables('factoryId'), '/datasets/SQL_ControlDB')]",
 				"[concat(variables('factoryId'), '/pipelines/store-table-metadata')]"
 			]
@@ -6910,7 +8548,6 @@
 				}
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
 				"[concat(variables('factoryId'), '/linkedServices/AzureDataLakeStorage')]"
 			]
 		},
@@ -6944,7 +8581,6 @@
 				}
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
 				"[concat(variables('factoryId'), '/linkedServices/AzureDataLakeStorage')]"
 			]
 		},
@@ -6986,7 +8622,6 @@
 				"schema": []
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
 				"[concat(variables('factoryId'), '/linkedServices/AzureDataLakeStorage')]"
 			]
 		},
@@ -7030,7 +8665,39 @@
 				"schema": []
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
+				"[concat(variables('factoryId'), '/linkedServices/AzureDataLakeStorage')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DLS_Folder')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureDataLakeStorage",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"folderPath": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/DLS"
+				},
+				"annotations": [],
+				"type": "Binary",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileSystem": {
+							"value": "@dataset().folderPath",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			"dependsOn": [
 				"[concat(variables('factoryId'), '/linkedServices/AzureDataLakeStorage')]"
 			]
 		},
@@ -7065,7 +8732,6 @@
 				"schema": {}
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
 				"[concat(variables('factoryId'), '/linkedServices/AzureDataLakeStorage')]"
 			]
 		},
@@ -7101,8 +8767,79 @@
 				"schema": []
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
 				"[concat(variables('factoryId'), '/linkedServices/AzureDataLakeStorage')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DV_Entity')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "Dataverse",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"kvSecret": {
+							"value": "@dataset().kvSecret",
+							"type": "Expression"
+						}
+					}
+				},
+				"parameters": {
+					"kvSecret": {
+						"type": "string"
+					},
+					"EntityName": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/DV"
+				},
+				"annotations": [],
+				"type": "CommonDataServiceForAppsEntity",
+				"schema": [],
+				"typeProperties": {
+					"entityName": {
+						"value": "@dataset().EntityName",
+						"type": "Expression"
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/Dataverse')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DV_Server')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "Dataverse",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"kvSecret": {
+							"value": "@dataset().kvSecret",
+							"type": "Expression"
+						}
+					}
+				},
+				"parameters": {
+					"kvSecret": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/DV"
+				},
+				"annotations": [],
+				"type": "CommonDataServiceForAppsEntity",
+				"schema": [],
+				"typeProperties": {}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/Dataverse')]"
 			]
 		},
 		{
@@ -7137,8 +8874,91 @@
 				}
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
 				"[concat(variables('factoryId'), '/linkedServices/HttpLinkAnonymous')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/NFS_Binary')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "NetworkFileShare",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"systemName": {
+							"value": "@dataset().systemName",
+							"type": "Expression"
+						}
+					}
+				},
+				"parameters": {
+					"systemName": {
+						"type": "string"
+					},
+					"filePath": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/NFS"
+				},
+				"annotations": [],
+				"type": "Binary",
+				"typeProperties": {
+					"location": {
+						"type": "FileServerLocation",
+						"fileName": {
+							"value": "@dataset().filePath",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/NetworkFileShare')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/NFS_Folder')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "NetworkFileShare",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"systemName": {
+							"value": "@dataset().systemName",
+							"type": "Expression"
+						}
+					}
+				},
+				"parameters": {
+					"systemName": {
+						"type": "string"
+					},
+					"folderPath": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/NFS"
+				},
+				"annotations": [],
+				"type": "Binary",
+				"typeProperties": {
+					"location": {
+						"type": "FileServerLocation",
+						"folderPath": {
+							"value": "@dataset().folderPath",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/NetworkFileShare')]"
 			]
 		},
 		{
@@ -7170,7 +8990,6 @@
 				"schema": []
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
 				"[concat(variables('factoryId'), '/linkedServices/REST_Anonymous')]"
 			]
 		},
@@ -7217,7 +9036,6 @@
 				}
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
 				"[concat(variables('factoryId'), '/linkedServices/AmazonS3')]"
 			]
 		},
@@ -7260,7 +9078,6 @@
 				}
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
 				"[concat(variables('factoryId'), '/linkedServices/AmazonS3')]"
 			]
 		},
@@ -7294,7 +9111,6 @@
 				}
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
 				"[concat(variables('factoryId'), '/linkedServices/SFTP_Basic')]"
 			]
 		},
@@ -7316,7 +9132,6 @@
 				"typeProperties": {}
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
 				"[concat(variables('factoryId'), '/linkedServices/AzureSqlDatabase_Ctrldb')]"
 			]
 		},
@@ -7346,7 +9161,6 @@
 				"typeProperties": {}
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
 				"[concat(variables('factoryId'), '/linkedServices/SQLServer')]"
 			]
 		},
@@ -7391,7 +9205,6 @@
 				}
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
 				"[concat(variables('factoryId'), '/linkedServices/SQLServer')]"
 			]
 		},
@@ -7425,7 +9238,6 @@
 				}
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
 				"[concat(variables('factoryId'), '/linkedServices/AzureKeyVault')]"
 			]
 		},
@@ -7449,7 +9261,6 @@
 				}
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
 				"[concat(variables('factoryId'), '/linkedServices/AzureKeyVault')]"
 			]
 		},
@@ -7470,18 +9281,10 @@
 						},
 						"secretName": "Databricks-PAT"
 					},
-					"existingClusterId": {
-						"type": "AzureKeyVaultSecret",
-						"store": {
-							"referenceName": "AzureKeyVault",
-							"type": "LinkedServiceReference"
-						},
-						"secretName": "Databricks-ClusterId"
-					}
+					"existingClusterId": "[parameters('AzureDatabricks_defaultCluster_properties_typeProperties_existingClusterId')]"
 				}
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
 				"[concat(variables('factoryId'), '/linkedServices/AzureKeyVault')]"
 			]
 		},
@@ -7496,9 +9299,7 @@
 					"baseUrl": "[parameters('AzureKeyVault_properties_typeProperties_baseUrl')]"
 				}
 			},
-			"dependsOn": [
-				"[variables('factoryId')]"
-			]
+			"dependsOn": []
 		},
 		{
 			"name": "[concat(parameters('factoryName'), '/AzureSqlDatabase_Ctrldb')]",
@@ -7520,7 +9321,51 @@
 				}
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
+				"[concat(variables('factoryId'), '/linkedServices/AzureKeyVault')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/AzureSqlLS')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureSqlDatabase",
+				"typeProperties": {
+					"connectionString": "[parameters('AzureSqlLS_connectionString')]"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Dataverse')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"type": "CommonDataServiceForApps",
+				"parameters": {
+					"kvSecret": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"typeProperties": {
+					"deploymentType": "Online",
+					"serviceUri": "https://antaressolutions.crm6.dynamics.com",
+					"authenticationType": "AADServicePrincipal",
+					"servicePrincipalCredentialType": "ServicePrincipalKey",
+					"servicePrincipalId": "[parameters('Dataverse_properties_typeProperties_servicePrincipalId')]",
+					"servicePrincipalCredential": {
+						"type": "AzureKeyVaultSecret",
+						"store": {
+							"referenceName": "AzureKeyVault",
+							"type": "LinkedServiceReference"
+						},
+						"secretName": "ADF-Dataverse-Key"
+					}
+				}
+			},
+			"dependsOn": [
 				"[concat(variables('factoryId'), '/linkedServices/AzureKeyVault')]"
 			]
 		},
@@ -7542,8 +9387,51 @@
 					"authenticationType": "Anonymous"
 				}
 			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/LinkedserviceLS')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureSqlDatabase",
+				"typeProperties": {
+					"connectionString": "[parameters('LinkedserviceLS_connectionString')]"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/NetworkFileShare')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"type": "FileServer",
+				"parameters": {
+					"systemName": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"typeProperties": {
+					"host": "[parameters('NetworkFileShare_properties_typeProperties_host')]",
+					"userId": "[parameters('NetworkFileShare_properties_typeProperties_userId')]",
+					"password": {
+						"type": "AzureKeyVaultSecret",
+						"store": {
+							"referenceName": "AzureKeyVault",
+							"type": "LinkedServiceReference"
+						},
+						"secretName": {
+							"value": "@concat(linkedService().systemName, '-Password')",
+							"type": "Expression"
+						}
+					}
+				}
+			},
 			"dependsOn": [
-				"[variables('factoryId')]"
+				"[concat(variables('factoryId'), '/linkedServices/AzureKeyVault')]"
 			]
 		},
 		{
@@ -7564,9 +9452,7 @@
 					"authenticationType": "Anonymous"
 				}
 			},
-			"dependsOn": [
-				"[variables('factoryId')]"
-			]
+			"dependsOn": []
 		},
 		{
 			"name": "[concat(parameters('factoryName'), '/SFTP_Basic')]",
@@ -7592,7 +9478,6 @@
 				}
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
 				"[concat(variables('factoryId'), '/linkedServices/AzureKeyVault')]"
 			]
 		},
@@ -7623,28 +9508,8 @@
 				}
 			},
 			"dependsOn": [
-				"[variables('factoryId')]",
 				"[concat(variables('factoryId'), '/linkedServices/AzureKeyVault')]"
 			]
-		},
-		{
-			"name": "[parameters('factoryName')]",
-			"type": "Microsoft.DataFactory/factories",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"globalParameters": {
-					"keyVaultName": {
-						"type": "string",
-						"value": "[parameters('dataFactory_properties_globalParameters_keyVaultName_value')]"
-					},
-					"storageName": {
-						"type": "string",
-						"value": "[parameters('dataFactory_properties_globalParameters_storageName_value')]"
-					}
-				}
-			},
-			"dependsOn": [],
-			"location": "[parameters('dataFactory_location')]"
 		}
 	]
 }

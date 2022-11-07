@@ -33,7 +33,7 @@
 						},
 						"Value": {
 							"value": {
-								"value": "@pipeline().parameters.Value",
+								"value": "@if(equals(pipeline().parameters.Value, null), '', pipeline().parameters.Value)",
 								"type": "Expression"
 							},
 							"type": "String"
@@ -70,6 +70,8 @@
 		"folder": {
 			"name": "ELT-Framework/Common/Logging"
 		},
-		"annotations": []
-	}
+		"annotations": [],
+		"lastPublishTime": "2022-11-03T14:17:10Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
 }

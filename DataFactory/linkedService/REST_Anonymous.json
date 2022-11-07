@@ -1,5 +1,6 @@
 {
 	"name": "REST_Anonymous",
+	"type": "Microsoft.DataFactory/factories/linkedservices",
 	"properties": {
 		"parameters": {
 			"url": {

@@ -1,0 +1,24 @@
+{
+	"name": "SQL_Server",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "SQLServer",
+			"type": "LinkedServiceReference",
+			"parameters": {
+				"kvSecret": "@dataset().kvSecret"
+			}
+		},
+		"parameters": {
+			"kvSecret": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "ELT-Framework/SQL"
+		},
+		"annotations": [],
+		"type": "SqlServerTable",
+		"schema": []
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

@@ -7,17 +7,13 @@
 			"metadata": "Data Factory name",
 			"defaultValue": "adf-base-mdp-dev-01"
 		},
-		"dataFactory_properties_globalParameters_keyVaultName_value": {
-			"type": "string",
-			"defaultValue": "akv-base-mdp-dev-01"
+		"AzureSqlLS_connectionString": {
+			"type": "secureString",
+			"metadata": "Secure string for 'connectionString' of 'AzureSqlLS'"
 		},
-		"dataFactory_properties_globalParameters_storageName_value": {
-			"type": "string",
-			"defaultValue": "dlsbasemdpdev01"
-		},
-		"dataFactory_location": {
-			"type": "string",
-			"defaultValue": "australiaeast"
+		"LinkedserviceLS_connectionString": {
+			"type": "secureString",
+			"metadata": "Secure string for 'connectionString' of 'LinkedserviceLS'"
 		},
 		"AzureKeyVault_properties_typeProperties_baseUrl": {
 			"type": "string",
@@ -49,9 +45,49 @@
 			"type": "string",
 			"defaultValue": "https://dlsbasemdpdev01.dfs.core.windows.net"
 		},
+		"AzureDatabricks_defaultCluster_properties_typeProperties_existingClusterId": {
+			"type": "object",
+			"defaultValue": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "AzureKeyVault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "Databricks-ClusterId"
+			}
+		},
 		"AzureSqlDatabase_Ctrldb_properties_typeProperties_connectionString_secretName": {
 			"type": "string",
 			"defaultValue": "ADF-ControlDB"
+		},
+		"Dataverse_properties_typeProperties_servicePrincipalId": {
+			"type": "object",
+			"defaultValue": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "AzureKeyVault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "ADF-Dataverse-Service-Principle-ID"
+			}
+		},
+		"NetworkFileShare_properties_typeProperties_host": {
+			"type": "object",
+			"defaultValue": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "AzureKeyVault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": {
+					"value": "@concat(linkedService().systemName, '-Host')",
+					"type": "Expression"
+				}
+			}
+		},
+		"NetworkFileShare_properties_typeProperties_userId": {
+			"type": "string",
+			"defaultValue": "au.antares.org\\shir01_svc"
 		},
 		"SFTP_Basic_properties_typeProperties_host": {
 			"type": "object",
@@ -84,25 +120,6 @@
 		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
 	},
 	"resources": [
-		{
-			"name": "[parameters('factoryName')]",
-			"type": "Microsoft.DataFactory/factories",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"globalParameters": {
-					"keyVaultName": {
-						"type": "string",
-						"value": "[parameters('dataFactory_properties_globalParameters_keyVaultName_value')]"
-					},
-					"storageName": {
-						"type": "string",
-						"value": "[parameters('dataFactory_properties_globalParameters_storageName_value')]"
-					}
-				}
-			},
-			"dependsOn": [],
-			"location": "[parameters('dataFactory_location')]"
-		},
 		{
 			"name": "[concat(parameters('factoryName'), '/email-notication')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
@@ -197,7 +214,8 @@
 				"folder": {
 					"name": "ELT-Framework/EmailTrigger"
 				},
-				"annotations": []
+				"annotations": [],
+				"lastPublishTime": "2022-11-03T14:17:10Z"
 			},
 			"dependsOn": []
 		},
@@ -210,6 +228,19 @@
 				"type": "AzureKeyVault",
 				"typeProperties": {
 					"baseUrl": "[parameters('AzureKeyVault_properties_typeProperties_baseUrl')]"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/AzureSqlLS')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureSqlDatabase",
+				"typeProperties": {
+					"connectionString": "[parameters('AzureSqlLS_connectionString')]"
 				}
 			},
 			"dependsOn": []
@@ -235,6 +266,19 @@
 			"dependsOn": []
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/LinkedserviceLS')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureSqlDatabase",
+				"typeProperties": {
+					"connectionString": "[parameters('LinkedserviceLS_connectionString')]"
+				}
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/REST_Anonymous')]",
 			"type": "Microsoft.DataFactory/factories/linkedServices",
 			"apiVersion": "2018-06-01",
@@ -253,6 +297,107 @@
 				}
 			},
 			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/send-email')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "send-email",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "get-url",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"url": {
+								"value": "@activity('get-url').output.value",
+								"type": "Expression"
+							},
+							"method": "POST",
+							"headers": {
+								"Content-Type": "application/json"
+							},
+							"body": {
+								"value": "{\n\t\"body\" : \"@{pipeline().parameters.body}\",\n\t\"subject\" : \"@{pipeline().parameters.subject}\",\n\t\"recipient\" : \"@{pipeline().parameters.email}\",\n\t\"importance\" : \"@{pipeline().parameters.importance}\"\n}",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "get-url",
+						"type": "WebActivity",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"url": {
+								"value": "https://@{pipeline().globalParameters.keyVaultName}.vault.azure.net/secrets/LogicApp-Url-Send-Email?api-version=7.0",
+								"type": "Expression"
+							},
+							"method": "GET",
+							"headers": {},
+							"linkedServices": [
+								{
+									"referenceName": "AzureKeyVault",
+									"type": "LinkedServiceReference"
+								}
+							],
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://vault.azure.net"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"email": {
+						"type": "string"
+					},
+					"subject": {
+						"type": "string"
+					},
+					"body": {
+						"type": "string"
+					},
+					"importance": {
+						"type": "string",
+						"defaultValue": "Normal"
+					}
+				},
+				"folder": {
+					"name": "ELT-Framework/EmailTrigger"
+				},
+				"annotations": [],
+				"lastPublishTime": "2022-06-23T06:15:03Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureKeyVault')]"
+			]
 		},
 		{
 			"name": "[concat(parameters('factoryName'), '/synapse-operation')]",
@@ -677,7 +822,8 @@
 				"folder": {
 					"name": "ELT-Framework/Management/Synapse"
 				},
-				"annotations": []
+				"annotations": [],
+				"lastPublishTime": "2022-11-03T14:17:10Z"
 			},
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/linkedServices/AzureKeyVault')]"
@@ -823,14 +969,7 @@
 						},
 						"secretName": "Databricks-PAT"
 					},
-					"existingClusterId": {
-						"type": "AzureKeyVaultSecret",
-						"store": {
-							"referenceName": "AzureKeyVault",
-							"type": "LinkedServiceReference"
-						},
-						"secretName": "Databricks-ClusterId"
-					}
+					"existingClusterId": "[parameters('AzureDatabricks_defaultCluster_properties_typeProperties_existingClusterId')]"
 				}
 			},
 			"dependsOn": [
@@ -853,6 +992,70 @@
 							"type": "LinkedServiceReference"
 						},
 						"secretName": "[parameters('AzureSqlDatabase_Ctrldb_properties_typeProperties_connectionString_secretName')]"
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureKeyVault')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Dataverse')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"type": "CommonDataServiceForApps",
+				"parameters": {
+					"kvSecret": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"typeProperties": {
+					"deploymentType": "Online",
+					"serviceUri": "https://antaressolutions.crm6.dynamics.com",
+					"authenticationType": "AADServicePrincipal",
+					"servicePrincipalCredentialType": "ServicePrincipalKey",
+					"servicePrincipalId": "[parameters('Dataverse_properties_typeProperties_servicePrincipalId')]",
+					"servicePrincipalCredential": {
+						"type": "AzureKeyVaultSecret",
+						"store": {
+							"referenceName": "AzureKeyVault",
+							"type": "LinkedServiceReference"
+						},
+						"secretName": "ADF-Dataverse-Key"
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureKeyVault')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/NetworkFileShare')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"type": "FileServer",
+				"parameters": {
+					"systemName": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"typeProperties": {
+					"host": "[parameters('NetworkFileShare_properties_typeProperties_host')]",
+					"userId": "[parameters('NetworkFileShare_properties_typeProperties_userId')]",
+					"password": {
+						"type": "AzureKeyVaultSecret",
+						"store": {
+							"referenceName": "AzureKeyVault",
+							"type": "LinkedServiceReference"
+						},
+						"secretName": {
+							"value": "@concat(linkedService().systemName, '-Password')",
+							"type": "Expression"
+						}
 					}
 				}
 			},
@@ -995,7 +1198,8 @@
 				"folder": {
 					"name": "ELT-Framework/Common/Logging"
 				},
-				"annotations": []
+				"annotations": [],
+				"lastPublishTime": "2022-11-03T14:17:10Z"
 			},
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/linkedServices/AzureSqlDatabase_Ctrldb')]"
@@ -1038,7 +1242,7 @@
 								},
 								"Value": {
 									"value": {
-										"value": "@pipeline().parameters.Value",
+										"value": "@if(equals(pipeline().parameters.Value, null), '', pipeline().parameters.Value)",
 										"type": "Expression"
 									},
 									"type": "String"
@@ -1079,160 +1283,11 @@
 				"folder": {
 					"name": "ELT-Framework/Common/Logging"
 				},
-				"annotations": []
+				"annotations": [],
+				"lastPublishTime": "2022-11-03T14:17:10Z"
 			},
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/linkedServices/AzureSqlDatabase_Ctrldb')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/DLS_Binary')]",
-			"type": "Microsoft.DataFactory/factories/datasets",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"linkedServiceName": {
-					"referenceName": "AzureDataLakeStorage",
-					"type": "LinkedServiceReference"
-				},
-				"parameters": {
-					"filePath": {
-						"type": "string"
-					}
-				},
-				"folder": {
-					"name": "ELT-Framework/DLS"
-				},
-				"annotations": [],
-				"type": "Binary",
-				"typeProperties": {
-					"location": {
-						"type": "AzureBlobFSLocation",
-						"fileName": {
-							"value": "@dataset().filePath",
-							"type": "Expression"
-						}
-					}
-				}
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/linkedServices/AzureDataLakeStorage')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/DLS_Binary_Folder')]",
-			"type": "Microsoft.DataFactory/factories/datasets",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"linkedServiceName": {
-					"referenceName": "AzureDataLakeStorage",
-					"type": "LinkedServiceReference"
-				},
-				"parameters": {
-					"folderPath": {
-						"type": "string"
-					}
-				},
-				"folder": {
-					"name": "ELT-Framework/DLS"
-				},
-				"annotations": [],
-				"type": "Binary",
-				"typeProperties": {
-					"location": {
-						"type": "AzureBlobFSLocation",
-						"fileSystem": {
-							"value": "@dataset().folderPath",
-							"type": "Expression"
-						}
-					}
-				}
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/linkedServices/AzureDataLakeStorage')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/DLS_Csv')]",
-			"type": "Microsoft.DataFactory/factories/datasets",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"linkedServiceName": {
-					"referenceName": "AzureDataLakeStorage",
-					"type": "LinkedServiceReference"
-				},
-				"parameters": {
-					"filePath": {
-						"type": "string"
-					}
-				},
-				"folder": {
-					"name": "ELT-Framework/DLS"
-				},
-				"annotations": [],
-				"type": "DelimitedText",
-				"typeProperties": {
-					"location": {
-						"type": "AzureBlobFSLocation",
-						"fileName": {
-							"value": "@dataset().filePath",
-							"type": "Expression"
-						}
-					},
-					"columnDelimiter": ",",
-					"escapeChar": "\\",
-					"firstRowAsHeader": {
-						"value": "@bool(true)",
-						"type": "Expression"
-					},
-					"quoteChar": "\""
-				},
-				"schema": []
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/linkedServices/AzureDataLakeStorage')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/DLS_Excel_index')]",
-			"type": "Microsoft.DataFactory/factories/datasets",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"linkedServiceName": {
-					"referenceName": "AzureDataLakeStorage",
-					"type": "LinkedServiceReference"
-				},
-				"parameters": {
-					"filePath": {
-						"type": "string"
-					},
-					"sheetIndex": {
-						"type": "int",
-						"defaultValue": 0
-					}
-				},
-				"folder": {
-					"name": "ELT-Framework/DLS"
-				},
-				"annotations": [],
-				"type": "Excel",
-				"typeProperties": {
-					"location": {
-						"type": "AzureBlobFSLocation",
-						"fileName": {
-							"value": "@dataset().filePath",
-							"type": "Expression"
-						}
-					},
-					"sheetIndex": {
-						"value": "@dataset().sheetIndex",
-						"type": "Expression"
-					},
-					"firstRowAsHeader": true
-				},
-				"schema": []
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/linkedServices/AzureDataLakeStorage')]"
 			]
 		}
 	]

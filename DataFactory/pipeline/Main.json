@@ -26,7 +26,7 @@
 					"source": {
 						"type": "AzureSqlSource",
 						"sqlReaderQuery": {
-							"value": "DECLARE @SystemCodes VARCHAR(50) = '@{pipeline().parameters.SystemCodes}';\nWITH [_SystemCodes] AS (\n\tSELECT DISTINCT TRIM(value) [SystemCode] FROM STRING_SPLIT(IIF(LEN(TRIM(@SystemCodes))=0, NULL, @SystemCodes), ',')\n)\nSELECT \nDISTINCT\nLEFT([SourceID], 2) [Order], M.[SystemCode]\nFROM [dbo].[ExtractLoadManifest] M\nJOIN [_SystemCodes] C ON C.[SystemCode] = M.[SystemCode] \nWHERE [Enabled] = 1 \nUNION \nSELECT \nDISTINCT\nLEFT([SourceID], 2) [Order], M.[SystemCode]\nFROM [dbo].[ExtractLoadManifest] M\nWHERE [Enabled] = 1 AND (SELECT COUNT(*) FROM [_SystemCodes]) = 0\nORDER BY 1",
+							"value": "DECLARE @SystemCodes VARCHAR(50) = '@{pipeline().parameters.SystemCodes}';\nDECLARE @BatchSize INT = @{pipeline().parameters.BatchSize};\nWITH\n    [_SystemCodes]\n    AS\n    (\n        SELECT DISTINCT TRIM(value) [SystemCode]\n        FROM STRING_SPLIT(IIF(LEN(TRIM(@SystemCodes))=0, NULL, @SystemCodes), ',')\n    ),\n\tExtractLoad AS\n\t(\n\t\tSELECT ROW_NUMBER() OVER(ORDER BY M.[SourceID]) / @BatchSize [Order], M.[SystemCode], M.[SourceID]\n\t\tFROM [dbo].[ExtractLoadManifest] M JOIN [_SystemCodes] C ON C.[SystemCode] = M.[SystemCode]\n\t\tWHERE [Enabled] = 1\n\t\tUNION\n\t\tSELECT ROW_NUMBER() OVER(ORDER BY M.[SourceID]) / @BatchSize [Order], M.[SystemCode], M.[SourceID]\n\t\tFROM [dbo].[ExtractLoadManifest] M\n\t\tWHERE [Enabled] = 1 AND (SELECT COUNT(*)\n\t\tFROM [_SystemCodes]) = 0\n\t)\n\tSELECT SystemCode, MIN([SourceID]) StartSourceID, MAX([SourceID]) EndSourceID\n\tFROM ExtractLoad\n\tGROUP BY [Order], [SystemCode]\n\tORDER BY [Order], MIN([SourceID])",
 							"type": "Expression"
 						},
 						"partitionOption": "None"
@@ -76,6 +76,14 @@
 									},
 									"ParentBatchID": {
 										"value": "@variables('ParentBatchID')",
+										"type": "Expression"
+									},
+									"StartSourceID": {
+										"value": "@item().StartSourceID",
+										"type": "Expression"
+									},
+									"EndSourceID": {
+										"value": "@item().EndSourceID",
 										"type": "Expression"
 									}
 								}
@@ -141,6 +149,10 @@
 		"parameters": {
 			"SystemCodes": {
 				"type": "string"
+			},
+			"BatchSize": {
+				"type": "int",
+				"defaultValue": 500
 			}
 		},
 		"variables": {
@@ -152,14 +164,14 @@
 			},
 			"Transform": {
 				"type": "Boolean",
-				"defaultValue": true
+				"defaultValue": false
 			}
 		},
 		"folder": {
 			"name": "ELT-Framework"
 		},
 		"annotations": [],
-		"lastPublishTime": "2021-07-08T02:50:54Z"
+		"lastPublishTime": "2022-11-03T14:17:12Z"
 	},
 	"type": "Microsoft.DataFactory/factories/pipelines"
 }

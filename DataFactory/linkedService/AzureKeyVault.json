@@ -1,11 +1,11 @@
 {
 	"name": "AzureKeyVault",
+	"type": "Microsoft.DataFactory/factories/linkedservices",
 	"properties": {
 		"annotations": [],
 		"type": "AzureKeyVault",
 		"typeProperties": {
-			"baseUrl": "https://au-akv-bi-mdw-dev-001.vault.azure.net/"
+			"baseUrl": "https://akv-base-mdp-dev-01.vault.azure.net/"
 		}
-	},
-	"type": "Microsoft.DataFactory/factories/linkedservices"
+	}
 }

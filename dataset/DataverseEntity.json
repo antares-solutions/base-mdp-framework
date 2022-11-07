@@ -1,0 +1,19 @@
+{
+	"name": "DataverseEntity",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "Dataverse",
+			"type": "LinkedServiceReference",
+			"parameters": {
+				"kvSecret": "@dataset().kvSecret"
+			}
+		},
+		"annotations": [],
+		"type": "CommonDataServiceForAppsEntity",
+		"schema": [],
+		"typeProperties": {
+			"entityName": "account"
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

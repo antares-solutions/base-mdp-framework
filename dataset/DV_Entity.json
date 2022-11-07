@@ -1,0 +1,36 @@
+{
+	"name": "DV_Entity",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "Dataverse",
+			"type": "LinkedServiceReference",
+			"parameters": {
+				"kvSecret": {
+					"value": "@dataset().kvSecret",
+					"type": "Expression"
+				}
+			}
+		},
+		"parameters": {
+			"kvSecret": {
+				"type": "string"
+			},
+			"EntityName": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "ELT-Framework/DV"
+		},
+		"annotations": [],
+		"type": "CommonDataServiceForAppsEntity",
+		"schema": [],
+		"typeProperties": {
+			"entityName": {
+				"value": "@dataset().EntityName",
+				"type": "Expression"
+			}
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

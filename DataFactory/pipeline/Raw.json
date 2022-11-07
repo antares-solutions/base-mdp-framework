@@ -213,16 +213,40 @@
 							]
 						},
 						{
-							"value": "nfs-binary-load",
+							"value": "s3-binary-load",
 							"activities": [
 								{
-									"name": "execute-nfs-binary-load",
+									"name": "execute-s3-binary-load",
 									"type": "ExecutePipeline",
 									"dependsOn": [],
 									"userProperties": [],
 									"typeProperties": {
 										"pipeline": {
-											"referenceName": "nfs-binary-load",
+											"referenceName": "s3-binary-load",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"task": {
+												"value": "@pipeline().parameters.task",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "dv-load",
+							"activities": [
+								{
+									"name": "execute-dv-load",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "dv-load",
 											"type": "PipelineReference"
 										},
 										"waitOnCompletion": true,
@@ -244,7 +268,7 @@
 				"type": "IfCondition",
 				"dependsOn": [
 					{
-						"activity": "switch-source-handler",
+						"activity": "task-status",
 						"dependencyConditions": [
 							"Succeeded"
 						]
@@ -253,21 +277,14 @@
 				"userProperties": [],
 				"typeProperties": {
 					"expression": {
-						"value": "@not(empty(pipeline().parameters.task.RawHandler))",
+						"value": "@and(not(empty(pipeline().parameters.task.RawHandler)), \n    and(not(equals(activity('task-status').output.firstRow.SinkRowCount, null)),\n        greater(activity('task-status').output.firstRow.SinkRowCount, 0))\n)",
 						"type": "Expression"
 					},
 					"ifTrueActivities": [
 						{
 							"name": "raw-databricks",
 							"type": "DatabricksNotebook",
-							"dependsOn": [
-								{
-									"activity": "task-status",
-									"dependencyConditions": [
-										"Succeeded"
-									]
-								}
-							],
+							"dependsOn": [],
 							"policy": {
 								"timeout": "7.00:00:00",
 								"retry": 0,
@@ -295,65 +312,6 @@
 							"linkedServiceName": {
 								"referenceName": "AzureDatabricks_defaultCluster",
 								"type": "LinkedServiceReference"
-							}
-						},
-						{
-							"name": "task-status",
-							"type": "Lookup",
-							"dependsOn": [],
-							"policy": {
-								"timeout": "7.00:00:00",
-								"retry": 0,
-								"retryIntervalInSeconds": 30,
-								"secureOutput": false,
-								"secureInput": false
-							},
-							"userProperties": [],
-							"typeProperties": {
-								"source": {
-									"type": "AzureSqlSource",
-									"sqlReaderQuery": {
-										"value": "SELECT * FROM [dbo].[ExtractLoadStatus] WHERE [BatchID] = '@{pipeline().parameters.task.BatchID}' AND [SourceID] = '@{pipeline().parameters.task.SourceID}'",
-										"type": "Expression"
-									},
-									"queryTimeout": "02:00:00",
-									"partitionOption": "None"
-								},
-								"dataset": {
-									"referenceName": "SQL_ControlDB",
-									"type": "DatasetReference"
-								}
-							}
-						},
-						{
-							"name": "log-databricks",
-							"type": "ExecutePipeline",
-							"dependsOn": [
-								{
-									"activity": "raw-databricks",
-									"dependencyConditions": [
-										"Completed"
-									]
-								}
-							],
-							"userProperties": [],
-							"typeProperties": {
-								"pipeline": {
-									"referenceName": "log-message",
-									"type": "PipelineReference"
-								},
-								"waitOnCompletion": false,
-								"parameters": {
-									"ID": {
-										"value": "@pipeline().parameters.task.ID",
-										"type": "Expression"
-									},
-									"ActivityType": "raw-databricks",
-									"Message": {
-										"value": "@{activity('raw-databricks')}",
-										"type": "Expression"
-									}
-								}
 							}
 						}
 					]
@@ -507,40 +465,46 @@
 				}
 			},
 			{
-				"name": "log-status-fail-source",
-				"type": "ExecutePipeline",
+				"name": "task-status",
+				"type": "Lookup",
 				"dependsOn": [
 					{
 						"activity": "switch-source-handler",
 						"dependencyConditions": [
-							"Failed"
+							"Succeeded"
 						]
 					}
 				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
 				"userProperties": [],
 				"typeProperties": {
-					"pipeline": {
-						"referenceName": "log-status-update",
-						"type": "PipelineReference"
-					},
-					"waitOnCompletion": false,
-					"parameters": {
-						"ID": {
-							"value": "@pipeline().parameters.task.ID",
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "SELECT * FROM [dbo].[ExtractLoadStatus] WHERE [BatchID] = '@{pipeline().parameters.task.BatchID}' AND [SourceID] = '@{pipeline().parameters.task.SourceID}'",
 							"type": "Expression"
 						},
-						"Property": "RawStatus",
-						"Value": "Fail",
-						"TableName": "ExtractLoadStatus"
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "SQL_ControlDB",
+						"type": "DatasetReference"
 					}
 				}
 			},
 			{
-				"name": "log-status-end-fail-source",
+				"name": "log-databricks-failure",
 				"type": "ExecutePipeline",
 				"dependsOn": [
 					{
-						"activity": "switch-source-handler",
+						"activity": "if-raw-handler",
 						"dependencyConditions": [
 							"Failed"
 						]
@@ -549,7 +513,7 @@
 				"userProperties": [],
 				"typeProperties": {
 					"pipeline": {
-						"referenceName": "log-status-update",
+						"referenceName": "log-message",
 						"type": "PipelineReference"
 					},
 					"waitOnCompletion": false,
@@ -558,12 +522,42 @@
 							"value": "@pipeline().parameters.task.ID",
 							"type": "Expression"
 						},
-						"Property": "RawEndDTS",
-						"Value": {
-							"value": "@formatDateTime(convertTimeZone(utcnow(), 'UTC', 'AUS Eastern Standard Time'), 'yyyy-MM-dd HH:mm:ss')",
+						"ActivityType": "raw-databricks",
+						"Message": {
+							"value": "@{activity('raw-databricks')}",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "log-databricks-success",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "if-raw-handler",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "log-message",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": false,
+					"parameters": {
+						"ID": {
+							"value": "@pipeline().parameters.task.ID",
 							"type": "Expression"
 						},
-						"TableName": "ExtractLoadStatus"
+						"ActivityType": "raw-databricks",
+						"Message": {
+							"value": "@{activity('raw-databricks')}",
+							"type": "Expression"
+						}
 					}
 				}
 			}
@@ -576,6 +570,8 @@
 		"folder": {
 			"name": "ELT-Framework/Zone"
 		},
-		"annotations": []
-	}
+		"annotations": [],
+		"lastPublishTime": "2022-11-03T14:17:11Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
 }

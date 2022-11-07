@@ -7,7 +7,7 @@
 				"type": "IfCondition",
 				"dependsOn": [
 					{
-						"activity": "log-status-start",
+						"activity": "raw-row-sink-count",
 						"dependencyConditions": [
 							"Succeeded"
 						]
@@ -16,7 +16,7 @@
 				"userProperties": [],
 				"typeProperties": {
 					"expression": {
-						"value": "@not(empty(pipeline().parameters.task.TrustedHandler))",
+						"value": "@and(not(empty(pipeline().parameters.task.TrustedHandler)), \n    and(not(equals(activity('raw-row-sink-count').output.firstRow.SinkRowCount, null)),\n    greater(activity('raw-row-sink-count').output.firstRow.SinkRowCount, 0))\n)",
 						"type": "Expression"
 					},
 					"ifTrueActivities": [
@@ -47,37 +47,6 @@
 							"linkedServiceName": {
 								"referenceName": "AzureDatabricks_defaultCluster",
 								"type": "LinkedServiceReference"
-							}
-						},
-						{
-							"name": "log-databricks",
-							"type": "ExecutePipeline",
-							"dependsOn": [
-								{
-									"activity": "trusted-databricks",
-									"dependencyConditions": [
-										"Completed"
-									]
-								}
-							],
-							"userProperties": [],
-							"typeProperties": {
-								"pipeline": {
-									"referenceName": "log-message",
-									"type": "PipelineReference"
-								},
-								"waitOnCompletion": false,
-								"parameters": {
-									"ID": {
-										"value": "@pipeline().parameters.task.ID",
-										"type": "Expression"
-									},
-									"ActivityType": "trusted-databricks",
-									"Message": {
-										"value": "@{activity('trusted-databricks')}",
-										"type": "Expression"
-									}
-								}
 							}
 						}
 					]
@@ -229,6 +198,103 @@
 						"TableName": "ExtractLoadStatus"
 					}
 				}
+			},
+			{
+				"name": "log-databricks-success",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "if-trusted-handler",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "log-message",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": false,
+					"parameters": {
+						"ID": {
+							"value": "@pipeline().parameters.task.ID",
+							"type": "Expression"
+						},
+						"ActivityType": "trusted-databricks",
+						"Message": {
+							"value": "@{activity('trusted-databricks')}",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "log-databricks-failure",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "if-trusted-handler",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "log-message",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": false,
+					"parameters": {
+						"ID": {
+							"value": "@pipeline().parameters.task.ID",
+							"type": "Expression"
+						},
+						"ActivityType": "trusted-databricks",
+						"Message": {
+							"value": "@{activity('trusted-databricks')}",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "raw-row-sink-count",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "log-status-start",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "SELECT ISNULL(SinkRowCount, 0) AS SinkRowCount\nFROM dbo.ExtractLoadStatus\nWHERE BatchID = '@{pipeline().parameters.task.BatchID}' AND SourceID = @{pipeline().parameters.task.SourceID}",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "SQL_ControlDB",
+						"type": "DatasetReference"
+					}
+				}
 			}
 		],
 		"parameters": {
@@ -239,6 +305,8 @@
 		"folder": {
 			"name": "ELT-Framework/Zone"
 		},
-		"annotations": []
-	}
+		"annotations": [],
+		"lastPublishTime": "2022-11-03T14:17:11Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
 }

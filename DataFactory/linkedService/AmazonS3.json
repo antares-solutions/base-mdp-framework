@@ -1,5 +1,6 @@
 {
 	"name": "AmazonS3",
+	"type": "Microsoft.DataFactory/factories/linkedservices",
 	"properties": {
 		"parameters": {
 			"systemName": {

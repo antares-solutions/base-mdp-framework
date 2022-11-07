@@ -1,0 +1,145 @@
+{
+	"name": "Run-Raw-Pipeline",
+	"properties": {
+		"activities": [
+			{
+				"name": "set-parent-batch",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "ParentBatchID",
+					"value": {
+						"value": "@substring(pipeline().GroupId, 0,8)",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "get-tasks",
+				"description": "",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "set-parent-batch",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[dbo].[ExtractLoadInit]",
+						"storedProcedureParameters": {
+							"BatchID": {
+								"value": {
+									"value": "@variables('ParentBatchID')",
+									"type": "Expression"
+								}
+							},
+							"SystemCode": {
+								"value": {
+									"value": "@pipeline().parameters.SystemCode",
+									"type": "Expression"
+								}
+							},
+							"StartSourceID": {
+								"type": "Int32",
+								"value": {
+									"value": "@pipeline().parameters.StartSourceID",
+									"type": "Expression"
+								}
+							},
+							"EndSourceID": {
+								"type": "Int32",
+								"value": {
+									"value": "@pipeline().parameters.EndSourceID",
+									"type": "Expression"
+								}
+							}
+						},
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "SQL_ControlDB",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "for-each-raw",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "get-tasks",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('get-tasks').output.value",
+						"type": "Expression"
+					},
+					"isSequential": false,
+					"batchCount": 10,
+					"activities": [
+						{
+							"name": "execute-raw",
+							"type": "ExecutePipeline",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "Raw",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"task": {
+										"value": "@item()",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"SystemCode": {
+				"type": "string"
+			},
+			"StartSourceID": {
+				"type": "string"
+			},
+			"EndSourceID": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"ParentBatchID": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "ELT-Framework/Management/Rerun Main Pipeline Individually"
+		},
+		"annotations": [],
+		"lastPublishTime": "2022-11-03T14:17:12Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

@@ -1,0 +1,128 @@
+{
+	"name": "Run-Trusted-Pipeline",
+	"properties": {
+		"activities": [
+			{
+				"name": "get-tasks",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "\tSELECT S.BatchID, S.ID, S.LowWatermark\n\t,R.[SourceID]\n    ,R.[SystemCode]\n    ,[SourceSchema]\n    ,[SourceTableName]\n    ,[SourceQuery]\n    ,[SourceFolderPath]\n    ,[SourceFileName]\n    ,[SourceKeyVaultSecret]\n    ,[SourceHandler]\n    ,[LoadType]\n    ,[BusinessKeyColumn]\n    ,[WatermarkColumn]\n    ,[RawHandler]\n    ,R.[RawPath]\n    ,[TrustedHandler]\n    ,[TrustedPath]\n    ,[DestinationSchema]\n    ,[DestinationTableName]\n    ,[DestinationKeyVaultSecret]\n    ,[ExtendedProperties]\n\tFROM [dbo].[ExtractLoadStatus] S\n\tJOIN [dbo].[ExtractLoadManifest] R ON R.SourceID = S.SourceID\n\tWHERE \n\tS.BatchID = '@{pipeline().parameters.BatchId}'\n\tAND S.SystemCode = '@{pipeline().parameters.SystemCode}'\n\tAND R.[Enabled] = 1",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "SQL_ControlDB",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "for-each-trusted",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "get-tasks",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('get-tasks').output.value",
+						"type": "Expression"
+					},
+					"isSequential": false,
+					"batchCount": 10,
+					"activities": [
+						{
+							"name": "execute-trusted",
+							"type": "ExecutePipeline",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "Trusted",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"task": {
+										"value": "@item()",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "end-system",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "for-each-trusted",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "UPDATE U\nSET [EndedDTS] = CONVERT(DATETIME, CONVERT(DATETIMEOFFSET, GETDATE()) AT TIME ZONE 'AUS Eastern Standard Time')\nFROM [dbo].[ExtractLoadStatus] U\nWHERE BatchID = '@{pipeline().parameters.BatchId}'\nAND SystemCode = '@{pipeline().parameters.SystemCode}'\nSELECT 1 A",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "SQL_ControlDB",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			}
+		],
+		"parameters": {
+			"BatchId": {
+				"type": "string"
+			},
+			"SystemCode": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "ELT-Framework/Management/Rerun Main Pipeline Individually"
+		},
+		"annotations": [],
+		"lastPublishTime": "2022-11-03T14:17:11Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

@@ -261,6 +261,7 @@
 					],
 					"storeSettings": {
 						"type": "FileServerReadSettings",
+						"recursive": true,
 						"enablePartitionDiscovery": false
 					},
 					"formatSettings": {
@@ -346,6 +347,8 @@
 		"folder": {
 			"name": "ELT-Framework/SourceHandler/NFS"
 		},
-		"annotations": []
-	}
+		"annotations": [],
+		"lastPublishTime": "2022-06-23T06:15:05Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
 }

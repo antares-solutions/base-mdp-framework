@@ -1,8 +1,8 @@
-﻿
-
-CREATE PROCEDURE [dbo].[ExtractLoadInit] 
+﻿CREATE PROCEDURE [dbo].[ExtractLoadInit] 
 	@BatchID VARCHAR(MAX),
-	@SystemCode VARCHAR(MAX)
+	@SystemCode VARCHAR(MAX),
+	@StartSourceID INT,
+	@EndSourceID INT
 AS
 BEGIN
 
@@ -14,7 +14,7 @@ BEGIN
 			,[HighWatermark]
 			,RANK() OVER (PARTITION BY [SourceID] ORDER BY [CreatedDTS] DESC) [Rank]
 			FROM [dbo].[ExtractLoadStatus]
-			WHERE [HighWatermark] IS NOT NULL
+			WHERE [HighWatermark] IS NOT NULL AND RawStatus = 'Success' AND TrustedStatus = 'Success'
 		) T WHERE [Rank] = 1
 	)
 	INSERT INTO [dbo].[ExtractLoadStatus] (
@@ -45,8 +45,7 @@ BEGIN
 	,CONVERT(DATETIME, CONVERT(DATETIMEOFFSET, GETDATE()) AT TIME ZONE 'AUS Eastern Standard Time') [CreatedDTS]
 	FROM [dbo].[ExtractLoadManifest] S
 	LEFT JOIN [LastWatermark] W ON W.SourceID = S.SourceID 
-	WHERE SystemCode = @SystemCode
-	AND S.[Enabled] = 1
+	WHERE SystemCode = @SystemCode AND S.[Enabled] = 1 AND (S.[SourceID] >= @StartSourceID AND s.SourceID <= @EndSourceID)
 END
 
 BEGIN
@@ -56,6 +55,7 @@ BEGIN
     ,[SourceSchema]
     ,[SourceTableName]
     ,[SourceQuery]
+	,[SourceMetaData]
     ,[SourceFolderPath]
     ,[SourceFileName]
     ,[SourceKeyVaultSecret]
@@ -75,9 +75,10 @@ BEGIN
 	JOIN [dbo].[ExtractLoadManifest] R ON R.SourceID = S.SourceID
 	WHERE 
 	S.BatchID = @BatchID
-	AND S.SystemCode = @SystemCode
-	AND R.[Enabled] = 1
+	AND S.SystemCode = @SystemCode AND R.[Enabled] = 1 AND (S.[SourceID] >= @StartSourceID AND s.SourceID <= @EndSourceID)
 END
 
 END
 GO
+
+

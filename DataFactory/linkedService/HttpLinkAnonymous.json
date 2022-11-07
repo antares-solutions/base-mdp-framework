@@ -1,5 +1,6 @@
 {
 	"name": "HttpLinkAnonymous",
+	"type": "Microsoft.DataFactory/factories/linkedservices",
 	"properties": {
 		"parameters": {
 			"url": {

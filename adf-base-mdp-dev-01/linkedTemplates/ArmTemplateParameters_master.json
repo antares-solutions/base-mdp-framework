@@ -5,6 +5,12 @@
 		"factoryName": {
 			"value": "adf-base-mdp-dev-01"
 		},
+		"AzureSqlLS_connectionString": {
+			"value": ""
+		},
+		"LinkedserviceLS_connectionString": {
+			"value": ""
+		},
 		"AmazonS3_properties_typeProperties_accessKeyId": {
 			"value": {
 				"type": "AzureKeyVaultSecret",
@@ -21,14 +27,50 @@
 		"AzureDataLakeStorage_properties_typeProperties_url": {
 			"value": "https://dlsbasemdpdev01.dfs.core.windows.net"
 		},
+		"AzureDatabricks_defaultCluster_properties_typeProperties_existingClusterId": {
+			"value": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "AzureKeyVault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "Databricks-ClusterId"
+			}
+		},
 		"AzureKeyVault_properties_typeProperties_baseUrl": {
 			"value": "https://akv-base-mdp-dev-01.vault.azure.net/"
 		},
 		"AzureSqlDatabase_Ctrldb_properties_typeProperties_connectionString_secretName": {
 			"value": "ADF-ControlDB"
 		},
+		"Dataverse_properties_typeProperties_servicePrincipalId": {
+			"value": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "AzureKeyVault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "ADF-Dataverse-Service-Principle-ID"
+			}
+		},
 		"HttpLinkAnonymous_properties_typeProperties_url": {
 			"value": "@{linkedService().url}"
+		},
+		"NetworkFileShare_properties_typeProperties_host": {
+			"value": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "AzureKeyVault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": {
+					"value": "@concat(linkedService().systemName, '-Host')",
+					"type": "Expression"
+				}
+			}
+		},
+		"NetworkFileShare_properties_typeProperties_userId": {
+			"value": "au.antares.org\\shir01_svc"
 		},
 		"REST_Anonymous_properties_typeProperties_url": {
 			"value": "@{linkedService().url}"
@@ -55,15 +97,6 @@
 		},
 		"SQLServer_properties_typeProperties_connectionString_secretName": {
 			"value": "@linkedService().kvSecret"
-		},
-		"dataFactory_properties_globalParameters_keyVaultName_value": {
-			"value": "akv-base-mdp-dev-01"
-		},
-		"dataFactory_properties_globalParameters_storageName_value": {
-			"value": "dlsbasemdpdev01"
-		},
-		"dataFactory_location": {
-			"value": "australiaeast"
 		},
 		"containerUri": {
 			"value": ""
